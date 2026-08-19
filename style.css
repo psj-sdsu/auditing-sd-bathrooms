@@ -327,3 +327,12 @@ summary::-webkit-details-marker { display: none; }
   cursor: pointer;
   box-shadow: none;
 }
+.backHome {
+  display: inline-block;
+  margin: 2px 0 14px;
+  color: #0b69ff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.backHome:hover { text-decoration: underline; }
