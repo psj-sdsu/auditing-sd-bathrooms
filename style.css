@@ -1,0 +1,329 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #111;
+}
+
+#layout {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  height: 100vh;
+}
+
+#map {
+  height: 100vh;
+  width: 100%;
+  min-width: 0;
+}
+
+#panel {
+  background: #fff;
+  padding: 16px;
+  overflow-y: auto;
+  height: 100vh;
+  box-sizing: border-box;
+  border-left: 1px solid #e6e6e6;
+}
+
+/* ---- form ---- */
+label {
+  display: block;
+  margin: 8px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 9px 12px;
+  margin-top: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #7aa7ff;
+  box-shadow: 0 0 0 4px rgba(122,167,255,0.12);
+}
+
+select {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="%23666" d="M5.5 7.5l4.5 4.5 4.5-4.5" /></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 38px;
+}
+
+textarea { resize: vertical; min-height: 64px; }
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 14px;
+  font-size: 15px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  background: #0b69ff;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(11,105,255,0.12);
+}
+
+.hint {
+  font-size: 13px;
+  background: #f6f7fb;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  color: #333;
+  line-height: 1.35;
+}
+
+.mode {
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.mode.new { background: #eef6ff; color: #084298; }
+.mode.update { background: #fff3cd; color: #664d03; }
+
+#status { margin-top: 10px; font-size: 13px; color: #0b69ff; }
+
+details {
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  background: #fff;
+}
+
+summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  list-style: none;
+  margin: -6px -12px 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+summary::-webkit-details-marker { display: none; }
+
+/* Toggle hidden by default on desktop (you removed the button) */
+.mobileToggle { display: none; }
+
+/* ---------- MOBILE BOTTOM SHEET ---------- */
+@media (max-width: 900px) {
+  #layout { grid-template-columns: 1fr; }
+  #map { height: 100vh; }
+
+  #panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 72vh;
+    transform: translateY(calc(72vh - 92px));
+    transition: transform 180ms ease;
+
+    border-left: none;
+    border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.12);
+    z-index: 9999;
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    background: #fff;
+  }
+
+  #panel.open { transform: translateY(0); }
+
+  .drawerHeader {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10000;
+    padding: 10px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    margin: -12px -12px 10px;
+  }
+
+  .drawerHandle {
+    width: 54px;
+    height: 6px;
+    background: #bbb;
+    border-radius: 999px;
+    margin: 0 auto;
+  }
+
+  input, select, textarea { font-size: 15px; padding: 12px; }
+  button { font-size: 16px; padding: 12px; }
+}
+
+/* =========================================================
+   LEAFLET POPUP STYLES (CLEAN + FIXED HOURS + COMPACT DETAILS)
+   ========================================================= */
+
+.popup {
+  font-size: 13px;
+  line-height: 1.25;
+  min-width: 240px;
+}
+
+.popupTitle {
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.popupAddr {
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.popupMeta {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+
+/* Hours as a wrapped line instead of a chip */
+.hoursLine {
+  font-size: 13px;
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  border: 1px solid #eee;
+  background: #fafafa;
+  border-radius: 12px;
+  line-height: 1.3;
+}
+
+.hoursLabel {
+  font-weight: 800;
+  opacity: 0.75;
+  margin-right: 6px;
+}
+
+/* ---- quick info chips ---- */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e6e6e6;
+  background: #fafafa;
+  white-space: nowrap;
+}
+
+.chipLabel { opacity: 0.7; font-size: 12px; }
+.chipValue { font-weight: 700; font-size: 12px; }
+
+/* ---- collapsible details ---- */
+.popupDetails {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fff;
+  margin: 10px 0 8px;
+}
+
+/* when CLOSED: compact */
+.popupDetails:not([open]) {
+  padding: 0;
+}
+
+/* when OPEN: padded content */
+.popupDetails[open] {
+  padding: 8px 10px;
+}
+
+.popupDetails summary {
+  font-weight: 800;
+  cursor: pointer;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  list-style: none;
+}
+
+.popupDetails summary::-webkit-details-marker { display: none; }
+
+.popupDetails summary:hover {
+  background: #f6f7fb;
+}
+
+.section { margin-top: 10px; }
+
+.sectionTitle {
+  font-weight: 800;
+  margin: 8px 0 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* key–value rows */
+.kv {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.kv:last-child { border-bottom: none; }
+.k { opacity: 0.75; }
+.v { font-weight: 600; }
+
+/* ---- popup actions ---- */
+.popupActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.popupLink {
+  font-size: 12px;
+  text-decoration: none;
+  color: #0b69ff;
+  font-weight: 700;
+}
+
+/* override global button width inside popups */
+.popupBtn {
+  width: auto;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #0b69ff;
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  box-shadow: none;
+}
