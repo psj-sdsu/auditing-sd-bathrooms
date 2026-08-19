@@ -1,570 +1,1925 @@
-// app.js (FULL, cleaned, with temp pin + GPS button)
+// app.js
 document.addEventListener("DOMContentLoaded", () => {
-  /* ---------------- CONFIG ---------------- */
+
+  /* =========================================================
+     CONFIG
+     ========================================================= */
+
   const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbzwaED1ncgYe5hJ0nH9VBJkKiPP6CBNd1jup9GhlJUgXn8wraoTW6FmqYI-Pl07_eilbQ/exec";
+    "https://script.google.com/macros/s/AKfycbxlUzoIYNrVice9e4imFyxny7N8EknWVB13wby8fJKpsl4RkYD_W_PHZ5BhC1XLXiaOow/exec";
 
-  const UPDATES_CSV_URL =
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqaGnxOFnazRsFkP-J3tx0cMtjDi2a8-jLHR44XnjbUMIRudAtprAmulLVCD8nDxS-LbZghRA5TFrk/pub?gid=436844958&single=true&output=csv";
+  const SPREADSHEET_ID =
+    "1jb6Oi_8Ldmj9tJdjuBsDJDJ0jRNhPSN3-CUaCLrPyR0";
 
-  const BASELINE_CSV_URL = "data/restrooms_baseline_public.csv";
+  const RESTROOMS_SHEET =
+    "restrooms_editable";
 
-  // Baseline category codes -> human labels (edit as you confirm meanings)
+  const RESTROOMS_CSV_URL =
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(RESTROOMS_SHEET)}`;
+
+
+  /* =========================================================
+     BASELINE CATEGORY LABELS
+     ========================================================= */
+
   const CATEGORY_LABELS = {
     "2": "Beach / Coastal",
-    "3": "Library",
-    // Add more as you learn them:
+    "3": "Library"
+
+    // Add more when you confirm them:
     // "1": "Park / Outdoor",
     // "4": "Recreation center",
     // "5": "Transit / Transportation",
-    // "6": "Commercial",
+    // "6": "Commercial"
   };
 
-  /* ---------------- HELPERS ---------------- */
-  const $ = (id) => document.getElementById(id);
-  const toBool = (v) => ["true", "yes", "1"].includes(String(v).toLowerCase());
-  const esc = (s) =>
-    String(s ?? "").replace(/[&<>"']/g, (c) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[c]));
 
-  const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
+  /* =========================================================
+     HELPERS
+     ========================================================= */
+
+  const $ = (id) =>
+    document.getElementById(id);
+
+
+  const esc = (s) =>
+    String(s ?? "").replace(
+      /[&<>"']/g,
+      (c) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[c])
+    );
+
+
+  const isMobile = () =>
+    window
+      .matchMedia("(max-width: 900px)")
+      .matches;
+
 
   function fmtDate(s) {
-    const v = String(s ?? "").trim();
-    if (!v) return "";
-    const d = new Date(v);
-    if (isNaN(d.getTime())) return v; // fall back to raw string if parsing fails
-    return d.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const value =
+      String(s ?? "").trim();
+
+    if (!value) return "";
+
+    const date =
+      new Date(value);
+
+    if (isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString(
+      undefined,
+      {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
   }
 
-  /* ---------------- REQUIRED ELEMENTS ---------------- */
-  const panel = $("panel");
-  const form = $("surveyForm");
-  const submitBtn = $("submitBtn");
-  const statusEl = $("status");
 
-  if (!panel || !form || !submitBtn || !statusEl) {
-    console.error("Missing required elements (#panel, #surveyForm, #submitBtn, #status).");
+  /* =========================================================
+     REQUIRED ELEMENTS
+     ========================================================= */
+
+  const panel =
+    $("panel");
+
+  const form =
+    $("surveyForm");
+
+  const submitBtn =
+    $("submitBtn");
+
+  const statusEl =
+    $("status");
+
+
+  if (
+    !panel ||
+    !form ||
+    !submitBtn ||
+    !statusEl
+  ) {
+    console.error(
+      "Missing required elements (#panel, #surveyForm, #submitBtn, #status)."
+    );
+
     return;
   }
 
-  /* ---------------- FORM ELEMENTS ---------------- */
-  const placeIdEl = $("place_id");
-  const actionEl = $("action");
 
-  const auditDatetimeEl = $("audit_datetime");
-  const restroomNameEl = $("restroom_name");
-  const researcherNameEl = $("researcher_name");
-  const addressEl = $("address");
-  const latEl = $("latitude");
-  const lngEl = $("longitude");
+  /* =========================================================
+     FORM ELEMENTS
+     ========================================================= */
 
-  const openWhenVisitedEl = $("open_when_visited");
-  const hoursEl = $("advertised_hours");
-  const accessMethodEl = $("access_method");
-  const findabilityEl = $("findability");
+  const placeIdEl =
+    $("place_id");
 
-  const genderNeutralEl = $("gender_neutral");
-  const menstrualProductsEl = $("menstrual_products");
-  const showersEl = $("showers_available");
-  const waterRefillEl = $("water_refill_nearby");
-  const signageEl = $("visible_signage");
-  const camerasEl = $("security_cameras");
-  const adaEl = $("ada_accessible");
+  const actionEl =
+    $("action");
 
-  const accessBarriersEl = $("access_barriers");
-  const impressionsEl = $("overall_impressions");
-  const outsideEl = $("outside_context");
-  const notesEl = $("notes");
+  const auditDatetimeEl =
+    $("audit_datetime");
 
-  /* ---------------- MAP INIT ---------------- */
+  const restroomNameEl =
+    $("restroom_name");
+
+  const researcherNameEl =
+    $("researcher_name");
+
+  const addressEl =
+    $("address");
+
+  const latEl =
+    $("latitude");
+
+  const lngEl =
+    $("longitude");
+
+  const openWhenVisitedEl =
+    $("open_when_visited");
+
+  const hoursEl =
+    $("advertised_hours");
+
+  const accessMethodEl =
+    $("access_method");
+
+  const findabilityEl =
+    $("findability");
+
+  const genderNeutralEl =
+    $("gender_neutral");
+
+  const menstrualProductsEl =
+    $("menstrual_products");
+
+  const showersEl =
+    $("showers_available");
+
+  const waterRefillEl =
+    $("water_refill_nearby");
+
+  const signageEl =
+    $("visible_signage");
+
+  const camerasEl =
+    $("security_cameras");
+
+  const adaEl =
+    $("ada_accessible");
+
+  const accessBarriersEl =
+    $("access_barriers");
+
+  const impressionsEl =
+    $("overall_impressions");
+
+  const outsideEl =
+    $("outside_context");
+
+  const notesEl =
+    $("notes");
+
+
+  /* =========================================================
+     MAP INITIALIZATION
+     ========================================================= */
+
   let leafletMap;
+
   try {
-    leafletMap = L.map("map").setView([32.7157, -117.1611], 12);
-  } catch (e) {
-    console.error("Leaflet failed to initialize.", e);
+
+    leafletMap =
+      L.map("map")
+        .setView(
+          [32.7157, -117.1611],
+          12
+        );
+
+  } catch (error) {
+
+    console.error(
+      "Leaflet failed to initialize.",
+      error
+    );
+
     return;
   }
 
-  // Avoid global name collisions with the #map element
-  window.leafletMap = leafletMap;
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(leafletMap);
+  window.leafletMap =
+    leafletMap;
 
-  const leafletMarkers = L.layerGroup().addTo(leafletMap);
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution:
+        "&copy; OpenStreetMap contributors"
+    }
+  ).addTo(leafletMap);
+
+
+  const leafletMarkers =
+    L.layerGroup()
+      .addTo(leafletMap);
+
 
   function safeInvalidate() {
-    try { leafletMap.invalidateSize(); } catch (_) {}
+    try {
+      leafletMap.invalidateSize();
+    } catch (_) {}
   }
 
-  window.addEventListener("load", () => setTimeout(safeInvalidate, 250));
-  window.addEventListener("resize", () => setTimeout(safeInvalidate, 120));
 
-  /* ---------------- DRAFT MARKER (TEMP PIN) ---------------- */
+  window.addEventListener(
+    "load",
+    () =>
+      setTimeout(
+        safeInvalidate,
+        250
+      )
+  );
+
+
+  window.addEventListener(
+    "resize",
+    () =>
+      setTimeout(
+        safeInvalidate,
+        120
+      )
+  );
+
+
+  /* =========================================================
+     TEMPORARY DRAFT MARKER
+     ========================================================= */
+
   let draftMarker = null;
 
-  function setDraftMarker(lat, lng) {
+
+  function setDraftMarker(
+    lat,
+    lng
+  ) {
+
     if (draftMarker) {
-      leafletMap.removeLayer(draftMarker);
+      leafletMap.removeLayer(
+        draftMarker
+      );
+
       draftMarker = null;
     }
-    draftMarker = L.marker([lat, lng], { keyboard: false }).addTo(leafletMap);
-    draftMarker.bindPopup("New restroom location").openPopup();
+
+
+    draftMarker =
+      L.marker(
+        [lat, lng],
+        {
+          keyboard: false
+        }
+      )
+        .addTo(leafletMap);
+
+
+    draftMarker
+      .bindPopup(
+        "New restroom location"
+      )
+      .openPopup();
   }
+
 
   function clearDraftMarker() {
-    if (draftMarker) {
-      leafletMap.removeLayer(draftMarker);
-      draftMarker = null;
-    }
+
+    if (!draftMarker) return;
+
+    leafletMap.removeLayer(
+      draftMarker
+    );
+
+    draftMarker = null;
   }
 
-  /* ---------------- PANEL CONTROL ---------------- */
+
+  /* =========================================================
+     PANEL CONTROL
+     ========================================================= */
+
   function openPanel() {
-    if (isMobile()) panel.classList.add("open");
-    setTimeout(safeInvalidate, 250);
+
+    if (isMobile()) {
+      panel.classList.add(
+        "open"
+      );
+    }
+
+    setTimeout(
+      safeInvalidate,
+      250
+    );
   }
+
 
   function togglePanel() {
+
     if (!isMobile()) return;
-    panel.classList.toggle("open");
-    setTimeout(safeInvalidate, 250);
+
+    panel.classList.toggle(
+      "open"
+    );
+
+    setTimeout(
+      safeInvalidate,
+      250
+    );
   }
 
-  $("drawerHeader")?.addEventListener("click", togglePanel);
 
-  /* ---------------- MODE INDICATOR ---------------- */
+  $("drawerHeader")
+    ?.addEventListener(
+      "click",
+      togglePanel
+    );
+
+
+  /* =========================================================
+     MODE INDICATOR
+     ========================================================= */
+
   function setMode(mode) {
-    const m = $("modeIndicator");
-    if (!m) return;
-    m.className = mode === "update" ? "mode update" : "mode new";
-    m.hidden = false;
-    m.textContent =
+
+    const indicator =
+      $("modeIndicator");
+
+    if (!indicator) return;
+
+
+    indicator.className =
+      mode === "update"
+        ? "mode update"
+        : "mode new";
+
+
+    indicator.hidden =
+      false;
+
+
+    indicator.textContent =
       mode === "update"
         ? "Suggest a change to this restroom"
         : "Suggest a new restroom location";
   }
 
-  /* ---------------- CSV LOADING ---------------- */
+
+  /* =========================================================
+     GOOGLE SHEET CSV LOADING
+     ========================================================= */
+
   async function loadCsv(url) {
-    const res = await fetch(url);
-    const t = await res.text();
-    return Papa.parse(t, { header: true, skipEmptyLines: true }).data;
+
+    /*
+      Cache-buster helps make newly approved
+      records appear after refreshing.
+    */
+
+    const separator =
+      url.includes("?")
+        ? "&"
+        : "?";
+
+    const freshUrl =
+      `${url}${separator}_=${Date.now()}`;
+
+
+    const response =
+      await fetch(
+        freshUrl,
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        `Could not load restroom data. HTTP ${response.status}`
+      );
+    }
+
+
+    const text =
+      await response.text();
+
+
+    const parsed =
+      Papa.parse(
+        text,
+        {
+          header: true,
+          skipEmptyLines: true
+        }
+      );
+
+
+    if (
+      parsed.errors &&
+      parsed.errors.length
+    ) {
+
+      console.warn(
+        "CSV parsing warnings:",
+        parsed.errors
+      );
+    }
+
+
+    return parsed.data;
   }
 
-  /* ---------------- MARKERS ---------------- */
-  function popupHtml(r) {
-    const val = (x) => String(x ?? "").trim();
-    const has = (x) => !!val(x);
 
-    const normCode = (x) => val(x).replace(/\.0$/, ""); // "2.0" -> "2"
-    const isOneish = (x) => ["1", "1.0", "true", "yes"].includes(val(x).toLowerCase());
-    const isZeroish = (x) => ["0", "0.0", "false", "no"].includes(val(x).toLowerCase());
+  /* =========================================================
+     POPUP CONTENT
+     ========================================================= */
+
+  function popupHtml(r) {
+
+    const val = (x) =>
+      String(x ?? "").trim();
+
+
+    const has = (x) =>
+      !!val(x);
+
+
+    const normCode = (x) =>
+      val(x).replace(
+        /\.0$/,
+        ""
+      );
+
+
+    const isOneish = (x) =>
+      [
+        "1",
+        "1.0",
+        "true",
+        "yes"
+      ].includes(
+        val(x).toLowerCase()
+      );
+
+
+    const isZeroish = (x) =>
+      [
+        "0",
+        "0.0",
+        "false",
+        "no"
+      ].includes(
+        val(x).toLowerCase()
+      );
+
 
     const yn = (x) => {
-      if (!has(x)) return "";
-      if (isOneish(x)) return "Yes";
-      if (isZeroish(x)) return "No";
+
+      if (!has(x)) {
+        return "";
+      }
+
+      if (isOneish(x)) {
+        return "Yes";
+      }
+
+      if (isZeroish(x)) {
+        return "No";
+      }
+
       return val(x);
     };
 
-    const hasUpdate = has(r.timestamp);
 
-    const name = val(r.restroom_name || r.name || "Restroom");
-    const address = val(r.address);
+    const name =
+      val(
+        r.restroom_name ||
+        r.name ||
+        "Restroom"
+      );
 
-    const openStatus = yn(r.open_when_visited || r.restroom_open_status);
-    const hours = val(r.advertised_hours);
 
-    const ada = yn(r.ada_accessible);
-    const genderNeutral = yn(r.gender_neutral);
-    const menstrual = yn(r.menstrual_products);
-    const showers = yn(r.showers_available || r.showers);
+    const address =
+      val(r.address);
 
-    const updatedOn = hasUpdate ? fmtDate(r.timestamp) : "";
-    const assessedOn = !hasUpdate && has(r.restroom_assessment_date)
-      ? fmtDate(r.restroom_assessment_date)
-      : "";
 
-    // Facility type flags (baseline)
+    const openStatus =
+      yn(
+        r.open_when_visited ||
+        r.restroom_open_status
+      );
+
+
+    const hours =
+      val(
+        r.advertised_hours
+      );
+
+
+    const ada =
+      yn(
+        r.ada_accessible
+      );
+
+
+    const genderNeutral =
+      yn(
+        r.gender_neutral
+      );
+
+
+    const menstrual =
+      yn(
+        r.menstrual_products
+      );
+
+
+    const showers =
+      yn(
+        r.showers_available ||
+        r.showers
+      );
+
+
+    const assessedOn =
+      has(
+        r.restroom_assessment_date
+      )
+        ? fmtDate(
+            r.restroom_assessment_date
+          )
+        : "";
+
+
     const facilityTypes = [];
-    if (isOneish(r.public_buildings)) facilityTypes.push("Public building");
-    if (isOneish(r.outdoor_facilities)) facilityTypes.push("Outdoor facility");
-    if (isOneish(r.government_facilities)) facilityTypes.push("Government facility");
-    if (isOneish(r.commercial)) facilityTypes.push("Commercial");
-    if (isOneish(r.transportation_mts)) facilityTypes.push("Transportation / MTS");
-    if (isOneish(r.other)) facilityTypes.push("Other");
 
-    // Category mapping (baseline)
-    const catCode = normCode(r.category);
-    const categoryLabel = CATEGORY_LABELS[catCode] || "";
 
-    const chip = (label, value) => {
-      const v = val(value);
+    if (
+      isOneish(
+        r.public_buildings
+      )
+    ) {
+      facilityTypes.push(
+        "Public building"
+      );
+    }
+
+
+    if (
+      isOneish(
+        r.outdoor_facilities
+      )
+    ) {
+      facilityTypes.push(
+        "Outdoor facility"
+      );
+    }
+
+
+    if (
+      isOneish(
+        r.government_facilities
+      )
+    ) {
+      facilityTypes.push(
+        "Government facility"
+      );
+    }
+
+
+    if (
+      isOneish(
+        r.commercial
+      )
+    ) {
+      facilityTypes.push(
+        "Commercial"
+      );
+    }
+
+
+    if (
+      isOneish(
+        r.transportation_mts
+      )
+    ) {
+      facilityTypes.push(
+        "Transportation / MTS"
+      );
+    }
+
+
+    if (
+      isOneish(
+        r.other
+      )
+    ) {
+      facilityTypes.push(
+        "Other"
+      );
+    }
+
+
+    const categoryCode =
+      normCode(
+        r.category
+      );
+
+
+    const categoryLabel =
+      CATEGORY_LABELS[
+        categoryCode
+      ] || "";
+
+
+    const chip = (
+      label,
+      value
+    ) => {
+
+      const v =
+        val(value);
+
       if (!v) return "";
+
+
       return `
         <span class="chip">
-          <span class="chipLabel">${esc(label)}</span>
-          <span class="chipValue">${esc(v)}</span>
+          <span class="chipLabel">
+            ${esc(label)}
+          </span>
+
+          <span class="chipValue">
+            ${esc(v)}
+          </span>
         </span>
       `;
     };
 
-    const row = (label, value) => {
-      const v = val(value);
+
+    const row = (
+      label,
+      value
+    ) => {
+
+      const v =
+        val(value);
+
       if (!v) return "";
+
+
       return `
         <div class="kv">
-          <div class="k">${esc(label)}</div>
-          <div class="v">${esc(v)}</div>
+          <div class="k">
+            ${esc(label)}
+          </div>
+
+          <div class="v">
+            ${esc(v)}
+          </div>
         </div>
       `;
     };
 
+
     const accessSection = [
-      row("Access method", r.access_method),
-      row("Findability", r.findability),
+      row(
+        "Access method",
+        r.access_method
+      ),
+
+      row(
+        "Findability",
+        r.findability
+      )
     ].join("");
+
 
     const amenitiesSection = [
-      row("Water refill nearby", yn(r.water_refill_nearby)),
-      row("Visible signage", yn(r.visible_signage)),
-      row("Security cameras", yn(r.security_cameras)),
-      row("Baby changing", yn(r.baby_changing)),
+      row(
+        "Water refill nearby",
+        yn(
+          r.water_refill_nearby
+        )
+      ),
+
+      row(
+        "Visible signage",
+        yn(
+          r.visible_signage
+        )
+      ),
+
+      row(
+        "Security cameras",
+        yn(
+          r.security_cameras
+        )
+      ),
+
+      row(
+        "Baby changing",
+        yn(
+          r.baby_changing
+        )
+      )
     ].join("");
 
-    // Baseline hidden when update exists
-    const baselineSection = !hasUpdate
-      ? [
-          row("Operated by", r.operated_by),
-          row("Facility type", facilityTypes.join(", ")),
-          row("Category", categoryLabel),
-        ].join("")
-      : "";
 
-    const obsSection = [
-      row("Access barriers", r.access_barriers),
-      row("Overall impressions", r.overall_impressions),
-      row("Outside context", r.outside_context),
-      row("Notes", r.notes),
+    const baselineSection = [
+      row(
+        "Operated by",
+        r.operated_by
+      ),
+
+      row(
+        "Facility type",
+        facilityTypes.join(", ")
+      ),
+
+      row(
+        "Category",
+        categoryLabel
+      )
     ].join("");
+
+
+    const observationsSection = [
+      row(
+        "Access barriers",
+        r.access_barriers
+      ),
+
+      row(
+        "Overall impressions",
+        r.overall_impressions
+      ),
+
+      row(
+        "Outside context",
+        r.outside_context
+      ),
+
+      row(
+        "Notes",
+        r.notes
+      )
+    ].join("");
+
 
     const hasDetails =
-      !!accessSection || !!amenitiesSection || !!baselineSection || !!obsSection;
+      !!accessSection ||
+      !!amenitiesSection ||
+      !!baselineSection ||
+      !!observationsSection;
+
 
     const googleMapsUrl =
-      has(r.latitude) && has(r.longitude)
-        ? `https://www.google.com/maps?q=${encodeURIComponent(r.latitude)},${encodeURIComponent(r.longitude)}`
+      has(r.latitude) &&
+      has(r.longitude)
+        ? `https://www.google.com/maps?q=${encodeURIComponent(
+            r.latitude
+          )},${encodeURIComponent(
+            r.longitude
+          )}`
         : "";
+
 
     return `
       <div class="popup">
-        <div class="popupTitle">${esc(name)}</div>
-        ${address ? `<div class="popupAddr">${esc(address)}</div>` : ""}
 
-        ${updatedOn ? `<div class="popupMeta">Updated (approved): ${esc(updatedOn)}</div>` : ""}
-        ${assessedOn ? `<div class="popupMeta">Baseline assessed: ${esc(assessedOn)}</div>` : ""}
+        <div class="popupTitle">
+          ${esc(name)}
+        </div>
 
-        ${hours ? `<div class="hoursLine"><span class="hoursLabel">Hours</span> ${esc(hours)}</div>` : ""}
+        ${
+          address
+            ? `
+              <div class="popupAddr">
+                ${esc(address)}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          assessedOn
+            ? `
+              <div class="popupMeta">
+                Last assessed:
+                ${esc(assessedOn)}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          hours
+            ? `
+              <div class="hoursLine">
+                <span class="hoursLabel">
+                  Hours
+                </span>
+
+                ${esc(hours)}
+              </div>
+            `
+            : ""
+        }
 
         <div class="chipRow">
-          ${chip("Open", openStatus)}
-          ${chip("ADA", ada)}
-          ${chip("Gender-neutral", genderNeutral)}
-          ${chip("Menstrual", menstrual)}
-          ${chip("Showers", showers)}
+
+          ${chip(
+            "Open",
+            openStatus
+          )}
+
+          ${chip(
+            "ADA",
+            ada
+          )}
+
+          ${chip(
+            "Gender-neutral",
+            genderNeutral
+          )}
+
+          ${chip(
+            "Menstrual",
+            menstrual
+          )}
+
+          ${chip(
+            "Showers",
+            showers
+          )}
+
         </div>
 
-        ${hasDetails ? `
-          <details class="popupDetails">
-            <summary>More details</summary>
+        ${
+          hasDetails
+            ? `
+              <details class="popupDetails">
 
-            ${accessSection ? `
-              <div class="section">
-                <div class="sectionTitle">Access & finding it</div>
-                ${accessSection}
-              </div>
-            ` : ""}
+                <summary>
+                  More details
+                </summary>
 
-            ${amenitiesSection ? `
-              <div class="section">
-                <div class="sectionTitle">Amenities & safety</div>
-                ${amenitiesSection}
-              </div>
-            ` : ""}
+                ${
+                  accessSection
+                    ? `
+                      <div class="section">
 
-            ${baselineSection ? `
-              <div class="section">
-                <div class="sectionTitle">About</div>
-                ${baselineSection}
-              </div>
-            ` : ""}
+                        <div class="sectionTitle">
+                          Access & finding it
+                        </div>
 
-            ${obsSection ? `
-              <div class="section">
-                <div class="sectionTitle">Field observations</div>
-                ${obsSection}
-              </div>
-            ` : ""}
-          </details>
-        ` : ""}
+                        ${accessSection}
+
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  amenitiesSection
+                    ? `
+                      <div class="section">
+
+                        <div class="sectionTitle">
+                          Amenities & safety
+                        </div>
+
+                        ${amenitiesSection}
+
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  baselineSection
+                    ? `
+                      <div class="section">
+
+                        <div class="sectionTitle">
+                          About
+                        </div>
+
+                        ${baselineSection}
+
+                      </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  observationsSection
+                    ? `
+                      <div class="section">
+
+                        <div class="sectionTitle">
+                          Field observations
+                        </div>
+
+                        ${observationsSection}
+
+                      </div>
+                    `
+                    : ""
+                }
+
+              </details>
+            `
+            : ""
+        }
 
         <div class="popupActions">
-          ${googleMapsUrl ? `<a class="popupLink" href="${googleMapsUrl}" target="_blank" rel="noopener">Open in Google Maps</a>` : ""}
-          <button class="popupBtn" data-update type="button">Suggest a change</button>
+
+          ${
+            googleMapsUrl
+              ? `
+                <a
+                  class="popupLink"
+                  href="${googleMapsUrl}"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Open in Google Maps
+                </a>
+              `
+              : ""
+          }
+
+          <button
+            class="popupBtn"
+            data-update
+            type="button"
+          >
+            Suggest a change
+          </button>
+
         </div>
+
       </div>
     `;
   }
 
+
+  /* =========================================================
+     DRAW MAP MARKERS
+     ========================================================= */
+
   function drawMarkers(rows) {
+
     leafletMarkers.clearLayers();
 
+
     rows.forEach((r) => {
-      const lat = +r.latitude;
-      const lng = +r.longitude;
-      if (!lat || !lng) return;
 
-      const m = L.marker([lat, lng]).addTo(leafletMarkers);
-      m.bindPopup(popupHtml(r), { maxWidth: 360 });
+      const lat =
+        Number(r.latitude);
 
-      m.on("popupopen", (e) => {
-        const root = e.popup.getElement();
-        if (!root) return;
-        const btn = root.querySelector("[data-update]");
-        if (!btn) return;
+      const lng =
+        Number(r.longitude);
 
-        btn.onclick = () => {
-          clearDraftMarker(); // don’t show draft pin when editing existing
-          fillForm(r, "update");
-          openPanel();
-        };
-      });
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+      ) {
+        return;
+      }
+
+
+      const marker =
+        L.marker(
+          [lat, lng]
+        )
+          .addTo(
+            leafletMarkers
+          );
+
+
+      marker.bindPopup(
+        popupHtml(r),
+        {
+          maxWidth: 360
+        }
+      );
+
+
+      marker.on(
+        "popupopen",
+        (e) => {
+
+          const root =
+            e.popup.getElement();
+
+          if (!root) return;
+
+
+          const button =
+            root.querySelector(
+              "[data-update]"
+            );
+
+          if (!button) return;
+
+
+          button.onclick = () => {
+
+            clearDraftMarker();
+
+            fillForm(
+              r,
+              "update"
+            );
+
+            openPanel();
+          };
+        }
+      );
     });
   }
 
-  /* ---------------- FILL FORM ---------------- */
-  function fillForm(r, mode) {
-    if (placeIdEl) placeIdEl.value = r.globalid || r.place_id || "";
-    if (actionEl) actionEl.value = mode;
+
+  /* =========================================================
+     FILL AUDIT FORM
+     ========================================================= */
+
+  function fillForm(
+    r,
+    mode
+  ) {
+
+    if (placeIdEl) {
+
+      placeIdEl.value =
+        r.globalid ||
+        r.place_id ||
+        "";
+    }
+
+
+    if (actionEl) {
+      actionEl.value =
+        mode;
+    }
+
 
     setMode(mode);
 
-    if (auditDatetimeEl) auditDatetimeEl.value = r.audit_datetime || "";
-    if (restroomNameEl) restroomNameEl.value = r.restroom_name || r.name || "";
-    if (researcherNameEl) researcherNameEl.value = r.researcher_name || "";
 
-    if (addressEl) addressEl.value = r.address || "";
-    if (latEl) latEl.value = r.latitude || "";
-    if (lngEl) lngEl.value = r.longitude || "";
+    if (auditDatetimeEl) {
 
-    if (openWhenVisitedEl) openWhenVisitedEl.value = r.open_when_visited || "";
-    if (hoursEl) hoursEl.value = r.advertised_hours || "";
+      /*
+        For a new audit, don't automatically reuse
+        the previous assessment date.
+      */
 
-    if (accessMethodEl) accessMethodEl.value = r.access_method || "";
-    if (findabilityEl) findabilityEl.value = r.findability || "";
+      auditDatetimeEl.value =
+        mode === "new"
+          ? ""
+          : "";
+    }
 
-    if (genderNeutralEl) genderNeutralEl.value = r.gender_neutral || "";
-    if (menstrualProductsEl) menstrualProductsEl.value = r.menstrual_products || "";
-    if (showersEl) showersEl.value = r.showers_available || r.showers || "";
-    if (waterRefillEl) waterRefillEl.value = r.water_refill_nearby || "";
-    if (signageEl) signageEl.value = r.visible_signage || "";
-    if (camerasEl) camerasEl.value = r.security_cameras || "";
-    if (adaEl) adaEl.value = r.ada_accessible || "";
 
-    if (accessBarriersEl) accessBarriersEl.value = r.access_barriers || "";
-    if (impressionsEl) impressionsEl.value = r.overall_impressions || "";
-    if (outsideEl) outsideEl.value = r.outside_context || "";
-    if (notesEl) notesEl.value = r.notes || "";
+    if (restroomNameEl) {
+
+      restroomNameEl.value =
+        r.restroom_name ||
+        r.name ||
+        "";
+    }
+
+
+    if (researcherNameEl) {
+
+      /*
+        Do not populate previous researcher's name
+        when someone suggests a new update.
+      */
+
+      researcherNameEl.value =
+        "";
+    }
+
+
+    if (addressEl) {
+      addressEl.value =
+        r.address || "";
+    }
+
+
+    if (latEl) {
+      latEl.value =
+        r.latitude || "";
+    }
+
+
+    if (lngEl) {
+      lngEl.value =
+        r.longitude || "";
+    }
+
+
+    if (openWhenVisitedEl) {
+
+      openWhenVisitedEl.value =
+        r.open_when_visited ||
+        r.restroom_open_status ||
+        "";
+    }
+
+
+    if (hoursEl) {
+
+      hoursEl.value =
+        r.advertised_hours ||
+        "";
+    }
+
+
+    if (accessMethodEl) {
+
+      accessMethodEl.value =
+        r.access_method ||
+        "";
+    }
+
+
+    if (findabilityEl) {
+
+      findabilityEl.value =
+        r.findability ||
+        "";
+    }
+
+
+    if (genderNeutralEl) {
+
+      genderNeutralEl.value =
+        normalizeYesNo(
+          r.gender_neutral
+        );
+    }
+
+
+    if (menstrualProductsEl) {
+
+      menstrualProductsEl.value =
+        normalizeYesNo(
+          r.menstrual_products
+        );
+    }
+
+
+    if (showersEl) {
+
+      showersEl.value =
+        normalizeYesNo(
+          r.showers_available ||
+          r.showers
+        );
+    }
+
+
+    if (waterRefillEl) {
+
+      waterRefillEl.value =
+        normalizeYesNo(
+          r.water_refill_nearby
+        );
+    }
+
+
+    if (signageEl) {
+
+      signageEl.value =
+        normalizeYesNo(
+          r.visible_signage
+        );
+    }
+
+
+    if (camerasEl) {
+
+      camerasEl.value =
+        normalizeYesNo(
+          r.security_cameras
+        );
+    }
+
+
+    if (adaEl) {
+
+      adaEl.value =
+        normalizeYesNo(
+          r.ada_accessible
+        );
+    }
+
+
+    if (accessBarriersEl) {
+
+      accessBarriersEl.value =
+        r.access_barriers ||
+        "";
+    }
+
+
+    if (impressionsEl) {
+
+      impressionsEl.value =
+        r.overall_impressions ||
+        "";
+    }
+
+
+    if (outsideEl) {
+
+      outsideEl.value =
+        r.outside_context ||
+        "";
+    }
+
+
+    if (notesEl) {
+
+      notesEl.value =
+        r.notes ||
+        "";
+    }
   }
 
-  /* ---------------- MAP CLICK -> NEW RESTROOM ---------------- */
-  leafletMap.on("click", (e) => {
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
 
-    setDraftMarker(lat, lng);
-    fillForm({ latitude: lat, longitude: lng }, "new");
-    openPanel();
-  });
+  function normalizeYesNo(value) {
 
-  /* ---------------- NEW RESTROOM BUTTON ---------------- */
-  const newRestroomBtn = $("newRestroomBtn");
-  if (newRestroomBtn) {
-    newRestroomBtn.addEventListener("click", () => {
-      clearDraftMarker();
+    const v =
+      String(
+        value ?? ""
+      )
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      [
+        "yes",
+        "true",
+        "1",
+        "1.0"
+      ].includes(v)
+    ) {
+      return "Yes";
+    }
+
+
+    if (
+      [
+        "no",
+        "false",
+        "0",
+        "0.0"
+      ].includes(v)
+    ) {
+      return "No";
+    }
+
+
+    return String(
+      value ?? ""
+    ).trim();
+  }
+
+
+  /* =========================================================
+     MAP CLICK -> NEW RESTROOM
+     ========================================================= */
+
+  leafletMap.on(
+    "click",
+    (e) => {
+
+      const lat =
+        e.latlng.lat;
+
+      const lng =
+        e.latlng.lng;
+
+
+      /*
+        Reset the form first so clicking the map
+        after editing an existing restroom does
+        not carry old values into the new submission.
+      */
+
       form.reset();
-      if (actionEl) actionEl.value = "new";
-      setMode("new");
+
+
+      setDraftMarker(
+        lat,
+        lng
+      );
+
+
+      fillForm(
+        {
+          latitude: lat.toFixed(6),
+          longitude: lng.toFixed(6)
+        },
+        "new"
+      );
+
+
       openPanel();
-      setTimeout(() => restroomNameEl?.focus(), 200);
-    });
-  }
-
-  /* ---------------- GPS BUTTON ---------------- */
-  const useLocationBtn = $("useLocationBtn");
-  if (useLocationBtn && "geolocation" in navigator) {
-    useLocationBtn.addEventListener("click", () => {
-      useLocationBtn.disabled = true;
-      useLocationBtn.textContent = "Locating…";
-
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-
-          leafletMap.setView([lat, lng], 17);
-          setDraftMarker(lat, lng);
-
-          if (latEl) latEl.value = lat.toFixed(6);
-          if (lngEl) lngEl.value = lng.toFixed(6);
-
-          openPanel();
-
-          useLocationBtn.textContent = "Use my location";
-          useLocationBtn.disabled = false;
-        },
-        (err) => {
-          console.warn("Geolocation error:", err);
-          alert("Unable to access your location. You can tap the map instead.");
-
-          useLocationBtn.textContent = "Use my location";
-          useLocationBtn.disabled = false;
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    });
-  } else if (useLocationBtn) {
-    useLocationBtn.disabled = true;
-    useLocationBtn.textContent = "Location not available";
-  }
-
-  /* ---------------- SUBMIT ---------------- */
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    if (!form.reportValidity()) {
-      const invalid = form.querySelector(":invalid");
-      if (invalid) {
-        const d = invalid.closest("details");
-        if (d) d.open = true;
-        invalid.scrollIntoView({ behavior: "smooth", block: "center" });
-        invalid.focus({ preventScroll: true });
-      }
-      return;
     }
+  );
 
-    submitBtn.textContent = "Submitting…";
-    submitBtn.disabled = true;
 
-    const payload = {
-      place_id: placeIdEl ? placeIdEl.value : "",
-      action: actionEl ? actionEl.value : "new",
+  /* =========================================================
+     NEW RESTROOM BUTTON
+     ========================================================= */
 
-      audit_datetime: auditDatetimeEl ? auditDatetimeEl.value : "",
-      restroom_name: restroomNameEl ? restroomNameEl.value : "",
-      researcher_name: researcherNameEl ? researcherNameEl.value : "",
+  const newRestroomBtn =
+    $("newRestroomBtn");
 
-      address: addressEl ? addressEl.value : "",
-      latitude: latEl ? latEl.value : "",
-      longitude: lngEl ? lngEl.value : "",
 
-      open_when_visited: openWhenVisitedEl ? openWhenVisitedEl.value : "",
-      advertised_hours: hoursEl ? hoursEl.value : "",
+  if (newRestroomBtn) {
 
-      access_method: accessMethodEl ? accessMethodEl.value : "",
-      findability: findabilityEl ? findabilityEl.value : "",
+    newRestroomBtn.addEventListener(
+      "click",
+      () => {
 
-      gender_neutral: genderNeutralEl ? genderNeutralEl.value : "",
-      menstrual_products: menstrualProductsEl ? menstrualProductsEl.value : "",
-      showers_available: showersEl ? showersEl.value : "",
-      water_refill_nearby: waterRefillEl ? waterRefillEl.value : "",
-      visible_signage: signageEl ? signageEl.value : "",
-      security_cameras: camerasEl ? camerasEl.value : "",
-      ada_accessible: adaEl ? adaEl.value : "",
+        clearDraftMarker();
 
-      access_barriers: accessBarriersEl ? accessBarriersEl.value : "",
-      overall_impressions: impressionsEl ? impressionsEl.value : "",
-      outside_context: outsideEl ? outsideEl.value : "",
-      notes: notesEl ? notesEl.value : "",
-    };
+        form.reset();
 
-    try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload),
-      });
 
-      statusEl.textContent = "Submitted ✓ Thank you!";
-      submitBtn.textContent = "Submit suggestion";
-      submitBtn.disabled = false;
-
-      form.reset();
-      setMode("new");
-      panel.scrollTop = 0;
-
-      clearDraftMarker();
-
-      if (isMobile()) panel.classList.add("open");
-      setTimeout(safeInvalidate, 250);
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent =
-        "Submit failed. Please check your connection and try again.";
-      submitBtn.textContent = "Submit suggestion";
-      submitBtn.disabled = false;
-    }
-  });
-
-  /* ---------------- INIT ---------------- */
-  (async () => {
-    try {
-      const baseline = await loadCsv(BASELINE_CSV_URL);
-      const updates = (await loadCsv(UPDATES_CSV_URL)).filter((r) =>
-        toBool(r.approved)
-      );
-
-      // Keep only the newest approved update per place_id (baseline uses globalid)
-      const latest = {};
-      updates.forEach((u) => {
-        const key = String(u.place_id ?? "").trim();
-        if (!key) return;
-
-        if (!latest[key] || Date.parse(u.timestamp) > Date.parse(latest[key].timestamp)) {
-          latest[key] = u;
+        if (placeIdEl) {
+          placeIdEl.value = "";
         }
-      });
 
-      // Merge by baseline.globalid <-> updates.place_id
-      const merged = baseline.map((b) => {
-        const key = String(b.globalid ?? "").trim();
-        return latest[key] ? { ...b, ...latest[key] } : b;
-      });
 
-      drawMarkers(merged);
-      setTimeout(safeInvalidate, 200);
+        if (actionEl) {
+          actionEl.value = "new";
+        }
+
+
+        setMode("new");
+
+        openPanel();
+
+
+        setTimeout(
+          () =>
+            restroomNameEl
+              ?.focus(),
+          200
+        );
+      }
+    );
+  }
+
+
+  /* =========================================================
+     GPS BUTTON
+     ========================================================= */
+
+  const useLocationBtn =
+    $("useLocationBtn");
+
+
+  if (
+    useLocationBtn &&
+    "geolocation" in navigator
+  ) {
+
+    useLocationBtn.addEventListener(
+      "click",
+      () => {
+
+        useLocationBtn.disabled =
+          true;
+
+        useLocationBtn.textContent =
+          "Locating…";
+
+
+        navigator.geolocation
+          .getCurrentPosition(
+
+            (position) => {
+
+              const lat =
+                position.coords.latitude;
+
+              const lng =
+                position.coords.longitude;
+
+
+              leafletMap.setView(
+                [lat, lng],
+                17
+              );
+
+
+              setDraftMarker(
+                lat,
+                lng
+              );
+
+
+              if (latEl) {
+
+                latEl.value =
+                  lat.toFixed(6);
+              }
+
+
+              if (lngEl) {
+
+                lngEl.value =
+                  lng.toFixed(6);
+              }
+
+
+              openPanel();
+
+
+              useLocationBtn.textContent =
+                "Use my location";
+
+              useLocationBtn.disabled =
+                false;
+            },
+
+
+            (error) => {
+
+              console.warn(
+                "Geolocation error:",
+                error
+              );
+
+
+              alert(
+                "Unable to access your location. You can tap the map instead."
+              );
+
+
+              useLocationBtn.textContent =
+                "Use my location";
+
+              useLocationBtn.disabled =
+                false;
+            },
+
+
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0
+            }
+          );
+      }
+    );
+
+  } else if (useLocationBtn) {
+
+    useLocationBtn.disabled =
+      true;
+
+    useLocationBtn.textContent =
+      "Location not available";
+  }
+
+
+  /* =========================================================
+     FORM SUBMISSION
+     ========================================================= */
+
+  form.addEventListener(
+    "submit",
+    async (e) => {
+
+      e.preventDefault();
+
+
+      if (!form.reportValidity()) {
+
+        const invalid =
+          form.querySelector(
+            ":invalid"
+          );
+
+
+        if (invalid) {
+
+          const details =
+            invalid.closest(
+              "details"
+            );
+
+
+          if (details) {
+            details.open = true;
+          }
+
+
+          invalid.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+          });
+
+
+          invalid.focus({
+            preventScroll: true
+          });
+        }
+
+
+        return;
+      }
+
+
+      submitBtn.textContent =
+        "Submitting…";
+
+      submitBtn.disabled =
+        true;
+
+      statusEl.textContent =
+        "";
+
+
+      const payload = {
+
+        place_id:
+          placeIdEl
+            ? placeIdEl.value
+            : "",
+
+
+        action:
+          actionEl
+            ? actionEl.value
+            : "new",
+
+
+        audit_datetime:
+          auditDatetimeEl
+            ? auditDatetimeEl.value
+            : "",
+
+
+        restroom_name:
+          restroomNameEl
+            ? restroomNameEl.value
+            : "",
+
+
+        researcher_name:
+          researcherNameEl
+            ? researcherNameEl.value
+            : "",
+
+
+        address:
+          addressEl
+            ? addressEl.value
+            : "",
+
+
+        latitude:
+          latEl
+            ? latEl.value
+            : "",
+
+
+        longitude:
+          lngEl
+            ? lngEl.value
+            : "",
+
+
+        open_when_visited:
+          openWhenVisitedEl
+            ? openWhenVisitedEl.value
+            : "",
+
+
+        advertised_hours:
+          hoursEl
+            ? hoursEl.value
+            : "",
+
+
+        access_method:
+          accessMethodEl
+            ? accessMethodEl.value
+            : "",
+
+
+        findability:
+          findabilityEl
+            ? findabilityEl.value
+            : "",
+
+
+        gender_neutral:
+          genderNeutralEl
+            ? genderNeutralEl.value
+            : "",
+
+
+        menstrual_products:
+          menstrualProductsEl
+            ? menstrualProductsEl.value
+            : "",
+
+
+        showers_available:
+          showersEl
+            ? showersEl.value
+            : "",
+
+
+        water_refill_nearby:
+          waterRefillEl
+            ? waterRefillEl.value
+            : "",
+
+
+        visible_signage:
+          signageEl
+            ? signageEl.value
+            : "",
+
+
+        security_cameras:
+          camerasEl
+            ? camerasEl.value
+            : "",
+
+
+        ada_accessible:
+          adaEl
+            ? adaEl.value
+            : "",
+
+
+        access_barriers:
+          accessBarriersEl
+            ? accessBarriersEl.value
+            : "",
+
+
+        overall_impressions:
+          impressionsEl
+            ? impressionsEl.value
+            : "",
+
+
+        outside_context:
+          outsideEl
+            ? outsideEl.value
+            : "",
+
+
+        notes:
+          notesEl
+            ? notesEl.value
+            : ""
+      };
+
+
+      try {
+
+        /*
+          We intentionally use text/plain here.
+          This works well with Google Apps Script
+          web apps and avoids unnecessary CORS
+          preflight complications.
+        */
+
+        const response =
+          await fetch(
+            APPS_SCRIPT_URL,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "text/plain;charset=utf-8"
+              },
+
+              body:
+                JSON.stringify(
+                  payload
+                )
+            }
+          );
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            `Submission failed. HTTP ${response.status}`
+          );
+        }
+
+
+        let result = null;
+
+
+        try {
+
+          result =
+            await response.json();
+
+        } catch (_) {
+
+          /*
+            If Apps Script returns a non-JSON
+            response for some reason, reaching
+            this point still means the HTTP
+            request completed.
+          */
+        }
+
+
+        if (
+          result &&
+          result.success === false
+        ) {
+
+          throw new Error(
+            result.error ||
+            "Submission was rejected by the server."
+          );
+        }
+
+
+        statusEl.textContent =
+          "Submitted ✓ Your audit is awaiting review.";
+
+
+        submitBtn.textContent =
+          "Submit suggestion";
+
+        submitBtn.disabled =
+          false;
+
+
+        form.reset();
+
+
+        if (placeIdEl) {
+          placeIdEl.value = "";
+        }
+
+
+        if (actionEl) {
+          actionEl.value = "new";
+        }
+
+
+        setMode("new");
+
+
+        panel.scrollTop =
+          0;
+
+
+        clearDraftMarker();
+
+
+        if (isMobile()) {
+
+          panel.classList.add(
+            "open"
+          );
+        }
+
+
+        setTimeout(
+          safeInvalidate,
+          250
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "Submission failed:",
+          error
+        );
+
+
+        statusEl.textContent =
+          "Submit failed. Please check your connection and try again.";
+
+
+        submitBtn.textContent =
+          "Submit suggestion";
+
+        submitBtn.disabled =
+          false;
+      }
+    }
+  );
+
+
+  /* =========================================================
+     LOAD APPROVED MASTER RESTROOM DATA
+     ========================================================= */
+
+  async function loadRestrooms() {
+
+    try {
+
+      statusEl.textContent =
+        "";
+
+
+      const restrooms =
+        await loadCsv(
+          RESTROOMS_CSV_URL
+        );
+
+
+      console.log(
+        `Loaded ${restrooms.length} restrooms from Google Sheets.`
+      );
+
+
+      drawMarkers(
+        restrooms
+      );
+
+
+      setTimeout(
+        safeInvalidate,
+        200
+      );
+
 
       if (isMobile()) {
-        panel.classList.add("open");
-        setTimeout(safeInvalidate, 250);
+
+        panel.classList.add(
+          "open"
+        );
+
+
+        setTimeout(
+          safeInvalidate,
+          250
+        );
       }
-    } catch (err) {
-      console.error("Failed to load baseline/updates CSV:", err);
+
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load restrooms_editable from Google Sheets:",
+        error
+      );
+
+
+      statusEl.textContent =
+        "Unable to load restroom data. Please refresh and try again.";
     }
-  })();
+  }
+
+
+  /* =========================================================
+     INITIALIZE
+     ========================================================= */
+
+  loadRestrooms();
+
 });
