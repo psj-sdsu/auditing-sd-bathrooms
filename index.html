@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Public Restrooms — San Diego</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="layout">
+    <div id="map"></div>
+
+    <aside id="panel">
+      <div class="drawerHeader" id="drawerHeader">
+        <div class="drawerHandle"></div>
+      </div>
+
+      <h2>Public Restrooms — San Diego</h2>
+
+      <div class="hint">
+        <p>
+          Hello and thank you for volunteering to document water, sanitation, and hygiene access
+          in San Diego communities with the Project for Sanitation Justice team.
+        </p>
+
+        <p>Use the map to contribute information on public restrooms in San Diego County:</p>
+
+        <ul>
+          <li>Click anywhere on the map to suggest a new restroom location</li>
+          <li>Click an existing restroom to suggest a change</li>
+        </ul>
+
+        <p>
+          Please conduct this audit by evaluating both the exterior and interior of the facility.
+          If the restroom is open when you arrive, indicate this in the form and additional
+          questions will appear regarding the interior.
+        </p>
+
+        <p>
+          Be prepared for this assessment to take some time — potentially 30 minutes or more
+          per facility.
+        </p>
+
+        <p>
+          All submissions are reviewed before appearing on the public map.
+        </p>
+
+        <p class="contact">
+          Questions: Dr. Megan Welsh Carroll —
+          <a href="mailto:mwelsh@sdsu.edu">mwelsh@sdsu.edu</a>
+        </p>
+      </div>
+
+      <button id="newRestroomBtn" type="button">
+        Suggest a new restroom location
+      </button>
+
+      <div id="modeIndicator" class="mode new" hidden></div>
+
+      <form id="surveyForm">
+        <input type="hidden" id="place_id" />
+        <input type="hidden" id="action" value="new" />
+
+        <details open>
+          <summary>Basics</summary>
+
+          <label>Date and time of audit *
+            <input id="audit_datetime" type="datetime-local" required />
+          </label>
+
+          <label>Name of Restroom *
+            <input id="restroom_name" required />
+          </label>
+
+          <label>Researcher Name *
+            <input id="researcher_name" required />
+          </label>
+
+          <label>Address / Nearby landmark
+            <input id="address" />
+          </label>
+
+          <div class="row2">
+            <label>Latitude *
+              <input id="latitude" required />
+            </label>
+            <label>Longitude *
+              <input id="longitude" required />
+            </label>
+          </div>
+
+          <button type="button" id="useLocationBtn">Use my location</button>
+        </details>
+
+        <details>
+          <summary>Access & finding it</summary>
+
+          <label>Is the restroom open when you visited it? *
+            <select id="open_when_visited" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+              <option>Permanently closed</option>
+            </select>
+          </label>
+
+          <label>What are the hours? *
+            <input id="advertised_hours" required />
+          </label>
+
+          <label>How is this bathroom accessed? *
+            <select id="access_method" required>
+              <option value="">—</option>
+              <option>Accessed from outside the building</option>
+              <option>Accessed from inside the building</option>
+              <option>Employee Access Only</option>
+            </select>
+          </label>
+
+          <label>Was this restroom easy to find? *
+            <select id="findability" required>
+              <option value="">—</option>
+              <option>Easily Visible</option>
+              <option>Somewhat visible</option>
+              <option>Somewhat hard to find</option>
+              <option>Very hard to find</option>
+            </select>
+          </label>
+        </details>
+
+        <details>
+          <summary>Amenities & safety</summary>
+
+          <label>Gender-neutral restroom available? *
+            <select id="gender_neutral" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>Menstrual products available? *
+            <select id="menstrual_products" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>Showers available? *
+            <select id="showers_available" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>Water refill nearby? *
+            <select id="water_refill_nearby" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>Visible signage? *
+            <select id="visible_signage" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>Security cameras present? *
+            <select id="security_cameras" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+
+          <label>ADA accessible? *
+            <select id="ada_accessible" required>
+              <option value="">—</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </label>
+        </details>
+
+        <details>
+          <summary>Observations</summary>
+
+          <label>Other barriers to access
+            <textarea id="access_barriers"></textarea>
+          </label>
+
+          <label>Overall impressions
+            <textarea id="overall_impressions"></textarea>
+          </label>
+
+          <label>Outside appearance & activity
+            <textarea id="outside_context"></textarea>
+          </label>
+
+          <label>Additional notes
+            <textarea id="notes"></textarea>
+          </label>
+        </details>
+
+        <button type="submit" id="submitBtn">Submit suggestion</button>
+        <div id="status" aria-live="polite"></div>
+      </form>
+    </aside>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="./app.js?v=gps-1"></script>
+</body>
+</html>
