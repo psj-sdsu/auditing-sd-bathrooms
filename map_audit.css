@@ -191,6 +191,14 @@ textarea {
   resize: vertical;
 }
 
+.fieldHint {
+  display: block;
+  margin-top: 6px;
+  color: #667085;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -248,7 +256,6 @@ textarea {
   background: rgba(15, 23, 42, 0.22);
 }
 
-/* Popup */
 .restroomPopup {
   min-width: 245px;
   font-size: 13px;
@@ -346,8 +353,8 @@ textarea {
   padding: 10px 12px;
   border: 1px solid #dbe1e8;
   border-radius: 11px;
-  background: rgba(255,255,255,.95);
-  box-shadow: 0 8px 20px rgba(28,45,64,.12);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 20px rgba(28, 45, 64, 0.12);
   color: #344054;
   font-size: 12px;
 }
