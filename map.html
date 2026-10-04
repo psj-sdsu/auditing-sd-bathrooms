@@ -9,6 +9,7 @@
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+
   <link rel="stylesheet" href="map_audit.css" />
 </head>
 
@@ -26,7 +27,9 @@
       <div>
         <p class="eyebrow">Project for Sanitation Justice</p>
         <h2 id="auditPanelTitle">Restroom Audit</h2>
-        <p id="modeIndicator" class="modeText">Suggest a new restroom location</p>
+        <p id="modeIndicator" class="modeText">
+          Suggest a new restroom location
+        </p>
       </div>
 
       <button
@@ -41,9 +44,11 @@
 
     <div class="auditIntro">
       <p>
-        Select an existing restroom and choose <strong>Suggest a change</strong>,
-        or start a new audit and select a location on the map.
+        Select an existing restroom and choose
+        <strong>Suggest a change</strong>, or start a new audit and select a
+        location on the map.
       </p>
+
       <p>
         All submissions are reviewed before approved changes appear on the map.
       </p>
@@ -93,7 +98,8 @@
         </button>
 
         <p class="locationHint">
-          For a new restroom, you can also click directly on the map to set the location.
+          For a new restroom, you can also click directly on the map to set the
+          location.
         </p>
       </details>
 
@@ -225,6 +231,20 @@
         <label>
           Additional notes
           <textarea id="notes"></textarea>
+        </label>
+
+        <label>
+          Add a photo
+          <input
+            id="audit_photo"
+            type="file"
+            accept="image/*"
+          />
+
+          <small class="fieldHint">
+            Optional. Photos are reviewed with the submission and are not
+            published automatically.
+          </small>
         </label>
       </details>
 
