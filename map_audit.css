@@ -1,418 +1,1329 @@
-html,
-body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  color: #172033;
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const APPS_SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbxlUzoIYNrVice9e4imFyxny7N8EknWVB13wby8fJKpsl4RkYD_W_PHZ5BhC1XLXiaOow/exec";
 
-* {
-  box-sizing: border-box;
-}
+  const SPREADSHEET_ID =
+    "1jb6Oi_8Ldmj9tJdjuBsDJDJ0jRNhPSN3-CUaCLrPyR0";
 
-#map {
-  position: fixed;
-  inset: 0;
-}
+  const RESTROOMS_SHEET = "restrooms_editable";
 
-.backHome {
-  position: fixed;
-  top: 16px;
-  left: 56px;
-  z-index: 1000;
-  padding: 10px 13px;
-  border: 1px solid #dde4ec;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #172033;
-  font-size: 13px;
-  font-weight: 750;
-  text-decoration: none;
-  box-shadow: 0 8px 20px rgba(28, 45, 64, 0.12);
-}
+  const RESTROOMS_CSV_URL =
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(RESTROOMS_SHEET)}`;
 
-.floatingAuditBtn {
-  position: fixed;
-  left: 18px;
-  bottom: 24px;
-  z-index: 1100;
-  width: auto;
-  margin: 0;
-  padding: 13px 18px;
-  border: 0;
-  border-radius: 13px;
-  background: #0b69ff;
-  color: white;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 10px 28px rgba(11, 105, 255, 0.28);
-}
+  const $ = (id) => document.getElementById(id);
 
-.floatingAuditBtn:hover {
-  background: #0756d1;
-}
+  const auditPanel = $("auditPanel");
+  const panelBackdrop = $("panelBackdrop");
+  const startAuditBtn = $("startAuditBtn");
+  const closeAuditBtn = $("closeAuditBtn");
 
-#auditPanel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 2000;
-  width: min(440px, 100vw);
-  height: 100vh;
-  padding: 20px;
-  overflow-y: auto;
-  background: #ffffff;
-  border-left: 1px solid #e4e8ee;
-  box-shadow: -18px 0 48px rgba(20, 32, 51, 0.17);
-  transform: translateX(103%);
-  transition: transform 200ms ease;
-}
+  const form = $("surveyForm");
+  const submitBtn = $("submitBtn");
+  const statusEl = $("status");
+  const modeIndicator = $("modeIndicator");
 
-#auditPanel.open {
-  transform: translateX(0);
-}
+  const placeIdEl = $("place_id");
+  const actionEl = $("action");
 
-.auditPanelHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e7ebf0;
-}
+  const auditDatetimeEl = $("audit_datetime");
+  const restroomNameEl = $("restroom_name");
+  const researcherNameEl = $("researcher_name");
+  const addressEl = $("address");
+  const latEl = $("latitude");
+  const lngEl = $("longitude");
 
-.auditPanelHeader h2 {
-  margin: 0;
-  font-size: 26px;
-  letter-spacing: -0.02em;
-}
+  const openWhenVisitedEl = $("open_when_visited");
+  const hoursEl = $("advertised_hours");
+  const accessMethodEl = $("access_method");
+  const findabilityEl = $("findability");
 
-.eyebrow {
-  margin: 0 0 7px;
-  color: #0b69ff;
-  font-size: 11px;
-  font-weight: 850;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
+  const genderNeutralEl = $("gender_neutral");
+  const menstrualProductsEl = $("menstrual_products");
+  const showersEl = $("showers_available");
+  const waterRefillEl = $("water_refill_nearby");
+  const signageEl = $("visible_signage");
+  const camerasEl = $("security_cameras");
+  const adaEl = $("ada_accessible");
 
-.modeText {
-  margin: 7px 0 0;
-  color: #667085;
-  font-size: 13px;
-}
+  const accessBarriersEl = $("access_barriers");
+  const impressionsEl = $("overall_impressions");
+  const outsideEl = $("outside_context");
+  const notesEl = $("notes");
+  const auditPhotoEl = $("audit_photo");
+  const useLocationBtn = $("useLocationBtn");
 
-.closeAuditBtn {
-  flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  margin: 0;
-  border: 1px solid #dde4ec;
-  border-radius: 10px;
-  background: white;
-  color: #344054;
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.auditIntro {
-  margin: 16px 0;
-  padding: 13px 14px;
-  border-radius: 12px;
-  background: #f5f8fc;
-  color: #475467;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.auditIntro p {
-  margin: 0;
-}
-
-.auditIntro p + p {
-  margin-top: 8px;
-}
-
-details {
-  margin: 12px 0;
-  padding: 10px 12px;
-  border: 1px solid #e4e8ee;
-  border-radius: 12px;
-  background: white;
-}
-
-summary {
-  cursor: pointer;
-  list-style: none;
-  font-weight: 800;
-  font-size: 15px;
-  padding: 4px 0 8px;
-}
-
-summary::-webkit-details-marker {
-  display: none;
-}
-
-label {
-  display: block;
-  margin: 10px 0 6px;
-  color: #263445;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-input,
-select,
-textarea {
-  width: 100%;
-  margin-top: 6px;
-  padding: 10px 11px;
-  border: 1px solid #d6dde7;
-  border-radius: 10px;
-  background: #fff;
-  color: #172033;
-  font: inherit;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: #7aa7ff;
-  box-shadow: 0 0 0 3px rgba(11, 105, 255, 0.11);
-}
-
-textarea {
-  min-height: 74px;
-  resize: vertical;
-}
-
-.fieldHint {
-  display: block;
-  margin-top: 6px;
-  color: #667085;
-  font-size: 0.85rem;
-  line-height: 1.4;
-}
-
-.row2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.secondaryBtn,
-.submitBtn {
-  width: 100%;
-  margin-top: 12px;
-  padding: 11px 13px;
-  border-radius: 11px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.secondaryBtn {
-  border: 1px solid #cad5e3;
-  background: white;
-  color: #172033;
-}
-
-.submitBtn {
-  border: 0;
-  background: #0b69ff;
-  color: white;
-}
-
-.submitBtn:disabled,
-.secondaryBtn:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.locationHint {
-  margin: 8px 0 0;
-  color: #667085;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-#status {
-  min-height: 20px;
-  margin-top: 10px;
-  color: #0b69ff;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.panelBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1900;
-  background: rgba(15, 23, 42, 0.22);
-}
-
-.restroomPopup {
-  min-width: 245px;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.popupTitle {
-  margin-bottom: 3px;
-  font-size: 16px;
-  font-weight: 850;
-}
-
-.popupAddress,
-.popupDate {
-  color: #667085;
-  font-size: 12px;
-}
-
-.popupStatus {
-  display: inline-flex;
-  align-items: center;
-  margin: 10px 0 8px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 12px;
-}
-
-.popupStatus-open {
-  background: #e8f0ff;
-  color: #1d4ed8;
-}
-
-.popupStatus-closed {
-  background: #feecec;
-  color: #b42318;
-}
-
-.popupStatus-unknown {
-  background: #f0f1f3;
-  color: #475467;
-}
-
-.popupHours {
-  margin: 4px 0;
-}
-
-.popupDetails {
-  margin-top: 9px;
-}
-
-.popupRow {
-  padding: 4px 0;
-  border-bottom: 1px dashed #eceff3;
-}
-
-.popupRow:last-child {
-  border-bottom: 0;
-}
-
-.popupActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.popupActionLink,
-.popupAuditBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 10px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 800;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.popupActionLink {
-  border: 1px solid #d8e0ea;
-  background: white;
-  color: #172033;
-}
-
-.popupAuditBtn {
-  border: 0;
-  background: #0b69ff;
-  color: white;
-}
-
-.mapLegend {
-  min-width: 145px;
-  padding: 10px 12px;
-  border: 1px solid #dbe1e8;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 8px 20px rgba(28, 45, 64, 0.12);
-  color: #344054;
-  font-size: 12px;
-}
-
-.legendTitle {
-  margin-bottom: 7px;
-  font-weight: 850;
-  color: #172033;
-}
-
-.legendItem {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 5px 0;
-}
-
-.legendDot {
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-  border-radius: 50%;
-}
-
-@media (max-width: 900px) {
-  .backHome {
-    left: 54px;
-    top: 12px;
+  function valueOf(value) {
+    return String(value ?? "").trim();
   }
 
-  .floatingAuditBtn {
-    left: 14px;
-    bottom: 20px;
+  function hasValue(value) {
+    return valueOf(value) !== "";
   }
 
-  #auditPanel {
-    top: auto;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: min(82vh, 760px);
-    border-left: 0;
-    border-top: 1px solid #e4e8ee;
-    border-radius: 18px 18px 0 0;
-    transform: translateY(103%);
+  function preparePhoto(file) {
+    if (!file) {
+      return Promise.resolve({
+        photo_name: "",
+        photo_type: "",
+        photo_data: "",
+      });
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return Promise.reject(
+        new Error("Please choose an image file.")
+      );
+    }
+
+    if (file.size > 12 * 1024 * 1024) {
+      return Promise.reject(
+        new Error("Please choose an image smaller than 12 MB.")
+      );
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => {
+        reject(
+          new Error("The selected image could not be read.")
+        );
+      };
+
+      reader.onload = () => {
+        const image = new Image();
+
+        image.onerror = () => {
+          reject(
+            new Error(
+              "The selected image could not be processed."
+            )
+          );
+        };
+
+        image.onload = () => {
+          const maxDimension = 1600;
+
+          const scale = Math.min(
+            1,
+            maxDimension /
+              Math.max(image.width, image.height)
+          );
+
+          const canvas =
+            document.createElement("canvas");
+
+          canvas.width = Math.max(
+            1,
+            Math.round(image.width * scale)
+          );
+
+          canvas.height = Math.max(
+            1,
+            Math.round(image.height * scale)
+          );
+
+          const context =
+            canvas.getContext("2d");
+
+          context.drawImage(
+            image,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          resolve({
+            photo_name: file.name,
+            photo_type: "image/jpeg",
+            photo_data: canvas.toDataURL(
+              "image/jpeg",
+              0.78
+            ),
+          });
+        };
+
+        image.src = reader.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
   }
 
-  #auditPanel.open {
-    transform: translateY(0);
+  function esc(value) {
+    return String(value ?? "").replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char])
+    );
   }
 
-  .panelBackdrop:not([hidden]) {
-    display: block;
+  function isYes(value) {
+    return [
+      "1",
+      "1.0",
+      "true",
+      "yes",
+      "y",
+      "open",
+    ].includes(
+      valueOf(value).toLowerCase()
+    );
   }
-}
 
-@media (min-width: 901px) {
-  .panelBackdrop {
-    display: none !important;
+  function isNo(value) {
+    return [
+      "0",
+      "0.0",
+      "false",
+      "no",
+      "n",
+      "closed",
+      "permanently closed",
+    ].includes(
+      valueOf(value).toLowerCase()
+    );
   }
-}
+
+  function yesNo(value) {
+    if (!hasValue(value)) return "";
+
+    if (isYes(value)) return "Yes";
+    if (isNo(value)) return "No";
+
+    return valueOf(value);
+  }
+
+  function normalizeYesNo(value) {
+    if (!hasValue(value)) return "";
+
+    if (isYes(value)) return "Yes";
+    if (isNo(value)) return "No";
+
+    return valueOf(value);
+  }
+
+  function formatDate(value) {
+    const raw = valueOf(value);
+
+    if (!raw) return "";
+
+    const date = new Date(raw);
+
+    if (Number.isNaN(date.getTime())) {
+      return raw;
+    }
+
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function isMobile() {
+    return window.matchMedia(
+      "(max-width: 900px)"
+    ).matches;
+  }
+
+  const map = L.map("map").setView(
+    [32.7157, -117.1611],
+    11
+  );
+
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution:
+        "&copy; OpenStreetMap contributors",
+    }
+  ).addTo(map);
+
+  const restroomMarkers =
+    L.layerGroup().addTo(map);
+
+  let draftMarker = null;
+  let restroomRows = [];
+
+  function openAuditPanel() {
+    auditPanel.classList.add("open");
+
+    auditPanel.setAttribute(
+      "aria-hidden",
+      "false"
+    );
+
+    if (isMobile()) {
+      panelBackdrop.hidden = false;
+    }
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 220);
+  }
+
+  function closeAuditPanel() {
+    auditPanel.classList.remove("open");
+
+    auditPanel.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    panelBackdrop.hidden = true;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 220);
+  }
+
+  function setMode(mode) {
+    if (actionEl) {
+      actionEl.value = mode;
+    }
+
+    if (mode === "update") {
+      modeIndicator.textContent =
+        "Suggest a change to this restroom";
+    } else {
+      modeIndicator.textContent =
+        "Suggest a new restroom location";
+    }
+  }
+
+  function clearDraftMarker() {
+    if (!draftMarker) return;
+
+    map.removeLayer(draftMarker);
+    draftMarker = null;
+  }
+
+  function setDraftMarker(lat, lng) {
+    clearDraftMarker();
+
+    draftMarker = L.marker(
+      [lat, lng],
+      {
+        keyboard: false,
+        zIndexOffset: 2000,
+      }
+    ).addTo(map);
+
+    draftMarker
+      .bindPopup("New restroom location")
+      .openPopup();
+  }
+
+  function resetForNewAudit() {
+    form.reset();
+
+    if (placeIdEl) {
+      placeIdEl.value = "";
+    }
+
+    if (actionEl) {
+      actionEl.value = "new";
+    }
+
+    setMode("new");
+    statusEl.textContent = "";
+    clearDraftMarker();
+  }
+
+  startAuditBtn.addEventListener(
+    "click",
+    () => {
+      resetForNewAudit();
+      openAuditPanel();
+    }
+  );
+
+  closeAuditBtn.addEventListener(
+    "click",
+    closeAuditPanel
+  );
+
+  panelBackdrop.addEventListener(
+    "click",
+    closeAuditPanel
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Escape" &&
+        auditPanel.classList.contains("open")
+      ) {
+        closeAuditPanel();
+      }
+    }
+  );
+
+  function getRestroomStatus(row) {
+    const rawStatus =
+      hasValue(row.open_when_visited)
+        ? row.open_when_visited
+        : row.restroom_open_status;
+
+    if (isYes(rawStatus)) return "open";
+    if (isNo(rawStatus)) return "closed";
+
+    return "unknown";
+  }
+
+  function getStatusLabel(row) {
+    const status =
+      getRestroomStatus(row);
+
+    if (status === "open") return "Open";
+    if (status === "closed") return "Closed";
+
+    return "Unknown";
+  }
+
+  function getStatusColor(row) {
+    const status =
+      getRestroomStatus(row);
+
+    if (status === "open") return "#2563eb";
+    if (status === "closed") return "#dc2626";
+
+    return "#808080";
+  }
+
+  function popupHtml(row) {
+    const name =
+      valueOf(row.restroom_name) ||
+      valueOf(row.name) ||
+      "Public Restroom";
+
+    const address =
+      valueOf(row.address);
+
+    const status =
+      getStatusLabel(row);
+
+    const hours =
+      valueOf(row.advertised_hours);
+
+    const operatedBy =
+      valueOf(row.operated_by);
+
+    const accessMethod =
+      valueOf(row.access_method);
+
+    const findability =
+      valueOf(row.findability);
+
+    const ada =
+      yesNo(row.ada_accessible);
+
+    const genderNeutral =
+      yesNo(row.gender_neutral);
+
+    const menstrualProducts =
+      yesNo(row.menstrual_products);
+
+    const showers =
+      yesNo(
+        row.showers_available ||
+        row.showers
+      );
+
+    const water =
+      yesNo(row.water_refill_nearby);
+
+    const signage =
+      yesNo(row.visible_signage);
+
+    const cameras =
+      yesNo(row.security_cameras);
+
+    const babyChanging =
+      yesNo(row.baby_changing);
+
+    const assessmentDate =
+      formatDate(
+        row.audit_datetime ||
+        row.restroom_assessment_date ||
+        row.timestamp
+      );
+
+    function rowHtml(label, value) {
+      if (!hasValue(value)) return "";
+
+      return `
+        <div class="popupRow">
+          <strong>${esc(label)}:</strong>
+          ${esc(value)}
+        </div>
+      `;
+    }
+
+    const googleMapsUrl =
+      hasValue(row.latitude) &&
+      hasValue(row.longitude)
+        ? `https://www.google.com/maps?q=${encodeURIComponent(
+            row.latitude
+          )},${encodeURIComponent(
+            row.longitude
+          )}`
+        : "";
+
+    return `
+      <div class="restroomPopup">
+        <div class="popupTitle">
+          ${esc(name)}
+        </div>
+
+        ${
+          address
+            ? `
+              <div class="popupAddress">
+                ${esc(address)}
+              </div>
+            `
+            : ""
+        }
+
+        <div class="popupStatus popupStatus-${getRestroomStatus(row)}">
+          ${esc(status)}
+        </div>
+
+        ${
+          hours
+            ? `
+              <div class="popupHours">
+                <strong>Hours:</strong>
+                ${esc(hours)}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          assessmentDate
+            ? `
+              <div class="popupDate">
+                Last assessed:
+                ${esc(assessmentDate)}
+              </div>
+            `
+            : ""
+        }
+
+        <div class="popupDetails">
+          ${rowHtml("Operated by", operatedBy)}
+          ${rowHtml("Access method", accessMethod)}
+          ${rowHtml("Findability", findability)}
+          ${rowHtml("ADA accessible", ada)}
+          ${rowHtml("Gender-neutral", genderNeutral)}
+          ${rowHtml("Menstrual products", menstrualProducts)}
+          ${rowHtml("Showers", showers)}
+          ${rowHtml("Water refill nearby", water)}
+          ${rowHtml("Visible signage", signage)}
+          ${rowHtml("Security cameras", cameras)}
+          ${rowHtml("Baby changing", babyChanging)}
+        </div>
+
+        <div class="popupActions">
+          ${
+            googleMapsUrl
+              ? `
+                <a
+                  class="popupActionLink"
+                  href="${googleMapsUrl}"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Google Maps
+                </a>
+              `
+              : ""
+          }
+
+          <button
+            type="button"
+            class="popupAuditBtn"
+            data-audit-update
+          >
+            Suggest a change
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function drawMarkers(rows) {
+    restroomMarkers.clearLayers();
+
+    const bounds = [];
+
+    rows.forEach((row) => {
+      const lat =
+        parseFloat(row.latitude);
+
+      const lng =
+        parseFloat(row.longitude);
+
+      if (
+        Number.isNaN(lat) ||
+        Number.isNaN(lng)
+      ) {
+        return;
+      }
+
+      const marker =
+        L.circleMarker(
+          [lat, lng],
+          {
+            radius: 7,
+            color: "#ffffff",
+            weight: 2,
+            fillColor:
+              getStatusColor(row),
+            fillOpacity: 0.92,
+          }
+        );
+
+      marker.bindPopup(
+        popupHtml(row),
+        {
+          maxWidth: 380,
+        }
+      );
+
+      marker.on(
+        "popupopen",
+        (event) => {
+          const popupRoot =
+            event.popup.getElement();
+
+          if (!popupRoot) return;
+
+          const button =
+            popupRoot.querySelector(
+              "[data-audit-update]"
+            );
+
+          if (!button) return;
+
+          button.onclick = () => {
+            clearDraftMarker();
+
+            fillForm(
+              row,
+              "update"
+            );
+
+            map.closePopup();
+            openAuditPanel();
+          };
+        }
+      );
+
+      marker.addTo(
+        restroomMarkers
+      );
+
+      bounds.push(
+        [lat, lng]
+      );
+    });
+
+    if (bounds.length > 0) {
+      map.fitBounds(
+        bounds,
+        {
+          padding: [35, 35],
+        }
+      );
+    }
+  }
+
+  function fillForm(
+    row,
+    mode
+  ) {
+    form.reset();
+
+    if (placeIdEl) {
+      placeIdEl.value =
+        row.globalid ||
+        row.place_id ||
+        "";
+    }
+
+    setMode(mode);
+
+    if (restroomNameEl) {
+      restroomNameEl.value =
+        row.restroom_name ||
+        row.name ||
+        "";
+    }
+
+    if (researcherNameEl) {
+      researcherNameEl.value = "";
+    }
+
+    if (addressEl) {
+      addressEl.value =
+        row.address || "";
+    }
+
+    if (latEl) {
+      latEl.value =
+        row.latitude || "";
+    }
+
+    if (lngEl) {
+      lngEl.value =
+        row.longitude || "";
+    }
+
+    if (openWhenVisitedEl) {
+      openWhenVisitedEl.value =
+        row.open_when_visited ||
+        row.restroom_open_status ||
+        "";
+    }
+
+    if (hoursEl) {
+      hoursEl.value =
+        row.advertised_hours ||
+        "";
+    }
+
+    if (accessMethodEl) {
+      accessMethodEl.value =
+        row.access_method ||
+        "";
+    }
+
+    if (findabilityEl) {
+      findabilityEl.value =
+        row.findability ||
+        "";
+    }
+
+    if (genderNeutralEl) {
+      genderNeutralEl.value =
+        normalizeYesNo(
+          row.gender_neutral
+        );
+    }
+
+    if (menstrualProductsEl) {
+      menstrualProductsEl.value =
+        normalizeYesNo(
+          row.menstrual_products
+        );
+    }
+
+    if (showersEl) {
+      showersEl.value =
+        normalizeYesNo(
+          row.showers_available ||
+          row.showers
+        );
+    }
+
+    if (waterRefillEl) {
+      waterRefillEl.value =
+        normalizeYesNo(
+          row.water_refill_nearby
+        );
+    }
+
+    if (signageEl) {
+      signageEl.value =
+        normalizeYesNo(
+          row.visible_signage
+        );
+    }
+
+    if (camerasEl) {
+      camerasEl.value =
+        normalizeYesNo(
+          row.security_cameras
+        );
+    }
+
+    if (adaEl) {
+      adaEl.value =
+        normalizeYesNo(
+          row.ada_accessible
+        );
+    }
+
+    if (accessBarriersEl) {
+      accessBarriersEl.value =
+        row.access_barriers ||
+        "";
+    }
+
+    if (impressionsEl) {
+      impressionsEl.value =
+        row.overall_impressions ||
+        "";
+    }
+
+    if (outsideEl) {
+      outsideEl.value =
+        row.outside_context ||
+        "";
+    }
+
+    if (notesEl) {
+      notesEl.value = "";
+    }
+
+    if (auditDatetimeEl) {
+      auditDatetimeEl.value = "";
+    }
+
+    statusEl.textContent = "";
+  }
+
+  map.on(
+    "click",
+    (event) => {
+      if (
+        !auditPanel.classList.contains(
+          "open"
+        )
+      ) {
+        return;
+      }
+
+      if (
+        valueOf(
+          actionEl.value
+        ).toLowerCase() !== "new"
+      ) {
+        return;
+      }
+
+      const lat =
+        event.latlng.lat;
+
+      const lng =
+        event.latlng.lng;
+
+      if (latEl) {
+        latEl.value =
+          lat.toFixed(6);
+      }
+
+      if (lngEl) {
+        lngEl.value =
+          lng.toFixed(6);
+      }
+
+      setDraftMarker(
+        lat,
+        lng
+      );
+    }
+  );
+
+  if (
+    useLocationBtn &&
+    "geolocation" in navigator
+  ) {
+    useLocationBtn.addEventListener(
+      "click",
+      () => {
+        useLocationBtn.disabled =
+          true;
+
+        useLocationBtn.textContent =
+          "Locating…";
+
+        navigator.geolocation
+          .getCurrentPosition(
+            (position) => {
+              const lat =
+                position.coords.latitude;
+
+              const lng =
+                position.coords.longitude;
+
+              map.setView(
+                [lat, lng],
+                17
+              );
+
+              if (latEl) {
+                latEl.value =
+                  lat.toFixed(6);
+              }
+
+              if (lngEl) {
+                lngEl.value =
+                  lng.toFixed(6);
+              }
+
+              if (
+                valueOf(
+                  actionEl.value
+                ).toLowerCase() === "new"
+              ) {
+                setDraftMarker(
+                  lat,
+                  lng
+                );
+              }
+
+              useLocationBtn.disabled =
+                false;
+
+              useLocationBtn.textContent =
+                "Use my location";
+            },
+            (error) => {
+              console.warn(
+                "Geolocation error:",
+                error
+              );
+
+              alert(
+                "Unable to access your location. You can click the map instead."
+              );
+
+              useLocationBtn.disabled =
+                false;
+
+              useLocationBtn.textContent =
+                "Use my location";
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            }
+          );
+      }
+    );
+  } else if (useLocationBtn) {
+    useLocationBtn.disabled =
+      true;
+
+    useLocationBtn.textContent =
+      "Location not available";
+  }
+
+  form.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+
+      if (
+        !form.reportValidity()
+      ) {
+        const invalid =
+          form.querySelector(
+            ":invalid"
+          );
+
+        if (invalid) {
+          const details =
+            invalid.closest(
+              "details"
+            );
+
+          if (details) {
+            details.open = true;
+          }
+
+          invalid.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+
+          invalid.focus({
+            preventScroll: true,
+          });
+        }
+
+        return;
+      }
+
+      submitBtn.disabled =
+        true;
+
+      submitBtn.textContent =
+        "Submitting…";
+
+      statusEl.textContent =
+        "";
+
+      let photo;
+
+      try {
+        photo = await preparePhoto(
+          auditPhotoEl
+            ? auditPhotoEl.files[0]
+            : null
+        );
+      } catch (error) {
+        statusEl.textContent =
+          error.message;
+
+        submitBtn.disabled =
+          false;
+
+        submitBtn.textContent =
+          "Submit suggestion";
+
+        return;
+      }
+
+      const payload = {
+        record_type: "restroom",
+
+        place_id:
+          placeIdEl
+            ? placeIdEl.value
+            : "",
+
+        action:
+          actionEl
+            ? actionEl.value
+            : "new",
+
+        audit_datetime:
+          auditDatetimeEl
+            ? auditDatetimeEl.value
+            : "",
+
+        restroom_name:
+          restroomNameEl
+            ? restroomNameEl.value
+            : "",
+
+        researcher_name:
+          researcherNameEl
+            ? researcherNameEl.value
+            : "",
+
+        address:
+          addressEl
+            ? addressEl.value
+            : "",
+
+        latitude:
+          latEl
+            ? latEl.value
+            : "",
+
+        longitude:
+          lngEl
+            ? lngEl.value
+            : "",
+
+        open_when_visited:
+          openWhenVisitedEl
+            ? openWhenVisitedEl.value
+            : "",
+
+        advertised_hours:
+          hoursEl
+            ? hoursEl.value
+            : "",
+
+        access_method:
+          accessMethodEl
+            ? accessMethodEl.value
+            : "",
+
+        findability:
+          findabilityEl
+            ? findabilityEl.value
+            : "",
+
+        gender_neutral:
+          genderNeutralEl
+            ? genderNeutralEl.value
+            : "",
+
+        menstrual_products:
+          menstrualProductsEl
+            ? menstrualProductsEl.value
+            : "",
+
+        showers_available:
+          showersEl
+            ? showersEl.value
+            : "",
+
+        water_refill_nearby:
+          waterRefillEl
+            ? waterRefillEl.value
+            : "",
+
+        visible_signage:
+          signageEl
+            ? signageEl.value
+            : "",
+
+        security_cameras:
+          camerasEl
+            ? camerasEl.value
+            : "",
+
+        ada_accessible:
+          adaEl
+            ? adaEl.value
+            : "",
+
+        access_barriers:
+          accessBarriersEl
+            ? accessBarriersEl.value
+            : "",
+
+        overall_impressions:
+          impressionsEl
+            ? impressionsEl.value
+            : "",
+
+        outside_context:
+          outsideEl
+            ? outsideEl.value
+            : "",
+
+        notes:
+          notesEl
+            ? notesEl.value
+            : "",
+
+        photo_name:
+          photo.photo_name,
+
+        photo_type:
+          photo.photo_type,
+
+        photo_data:
+          photo.photo_data,
+      };
+
+      try {
+        const response =
+          await fetch(
+            APPS_SCRIPT_URL,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "text/plain;charset=utf-8",
+              },
+
+              body:
+                JSON.stringify(
+                  payload
+                )
+            }
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Submission failed. HTTP ${response.status}`
+          );
+        }
+
+        let result = null;
+
+        try {
+          result =
+            await response.json();
+        } catch (_) {}
+
+        if (
+          result &&
+          result.success === false
+        ) {
+          throw new Error(
+            result.error ||
+            "Submission rejected."
+          );
+        }
+
+        statusEl.textContent =
+          "Submitted ✓ Your audit is awaiting review.";
+
+        clearDraftMarker();
+
+        setTimeout(
+          () => {
+            resetForNewAudit();
+            closeAuditPanel();
+          },
+          1200
+        );
+
+      } catch (error) {
+        console.error(
+          "Submission failed:",
+          error
+        );
+
+        statusEl.textContent =
+          "Submit failed. Please check your connection and try again.";
+
+      } finally {
+        submitBtn.disabled =
+          false;
+
+        submitBtn.textContent =
+          "Submit suggestion";
+      }
+    }
+  );
+
+  const legend =
+    L.control({
+      position: "bottomright",
+    });
+
+  legend.onAdd =
+    function () {
+      const div =
+        L.DomUtil.create(
+          "div",
+          "mapLegend"
+        );
+
+      div.innerHTML = `
+        <div class="legendTitle">
+          Restroom Status
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#2563eb;"
+          ></span>
+          Open
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#dc2626;"
+          ></span>
+          Closed
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#808080;"
+          ></span>
+          Unknown
+        </div>
+      `;
+
+      L.DomEvent.disableClickPropagation(div);
+
+      return div;
+    };
+
+  legend.addTo(map);
+
+  async function loadCsv(url) {
+    const separator =
+      url.includes("?")
+        ? "&"
+        : "?";
+
+    const freshUrl =
+      `${url}${separator}_=${Date.now()}`;
+
+    const response =
+      await fetch(
+        freshUrl,
+        {
+          cache: "no-store",
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not load restroom data. HTTP ${response.status}`
+      );
+    }
+
+    const text =
+      await response.text();
+
+    const parsed =
+      Papa.parse(
+        text,
+        {
+          header: true,
+          skipEmptyLines: true,
+        }
+      );
+
+    if (parsed.errors.length) {
+      console.warn(
+        "CSV parsing warnings:",
+        parsed.errors
+      );
+    }
+
+    return parsed.data;
+  }
+
+  async function initializeMap() {
+    try {
+      restroomRows =
+        await loadCsv(
+          RESTROOMS_CSV_URL
+        );
+
+      drawMarkers(
+        restroomRows
+      );
+
+      setTimeout(
+        () => {
+          map.invalidateSize();
+        },
+        200
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to load restroom data:",
+        error
+      );
+    }
+  }
+
+  initializeMap();
+
+  window.addEventListener(
+    "resize",
+    () => {
+      setTimeout(
+        () => {
+          map.invalidateSize();
+        },
+        100
+      );
+    }
+  );
+});
