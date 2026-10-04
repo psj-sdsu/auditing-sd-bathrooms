@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Public Restrooms — San Diego</title>
 
- <link
-  rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
-/>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+  />
 
-  <link rel="stylesheet" href="./map_audit.css?v=1" />
+  <link rel="stylesheet" href="./map_audit.css?v=4" />
 </head>
 
 <body>
@@ -26,7 +26,7 @@
     <div class="auditPanelHeader">
       <div>
         <p class="eyebrow">Project for Sanitation Justice</p>
-        <h2>Restroom Audit</h2>
+        <h2 id="auditPanelTitle">Restroom Audit</h2>
         <p id="modeIndicator" class="modeText">
           Suggest a new restroom location
         </p>
@@ -98,12 +98,13 @@
         </button>
 
         <p class="locationHint">
-          For a new restroom, click directly on the map to set the location.
+          For a new restroom, you can also click directly on the map to set the
+          location.
         </p>
       </details>
 
       <details>
-        <summary>Access & finding it</summary>
+        <summary>Access &amp; finding it</summary>
 
         <label>
           Is the restroom open when you visited it? *
@@ -143,7 +144,7 @@
       </details>
 
       <details>
-        <summary>Amenities & safety</summary>
+        <summary>Amenities &amp; safety</summary>
 
         <label>
           Gender-neutral restroom available? *
@@ -223,7 +224,7 @@
         </label>
 
         <label>
-          Outside appearance & activity
+          Outside appearance &amp; activity
           <textarea id="outside_context"></textarea>
         </label>
 
@@ -234,7 +235,11 @@
 
         <label>
           Add a photo
-          <input id="audit_photo" type="file" accept="image/*" />
+          <input
+            id="audit_photo"
+            type="file"
+            accept="image/*"
+          />
 
           <small class="fieldHint">
             Optional. Photos are reviewed with the submission and are not
@@ -254,6 +259,7 @@
   <div id="panelBackdrop" class="panelBackdrop" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./app_map_audit.js?v=4"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="./app_map_audit.js?v=4"></script>
 </body>
 </html>
