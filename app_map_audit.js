@@ -669,3 +669,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (bounds
+        });
+
