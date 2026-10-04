@@ -10,7 +10,7 @@
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
 
-  <link rel="stylesheet" href="map_audit.css" />
+  <link rel="stylesheet" href="./map_audit.css?v=1" />
 </head>
 
 <body>
@@ -26,7 +26,7 @@
     <div class="auditPanelHeader">
       <div>
         <p class="eyebrow">Project for Sanitation Justice</p>
-        <h2 id="auditPanelTitle">Restroom Audit</h2>
+        <h2>Restroom Audit</h2>
         <p id="modeIndicator" class="modeText">
           Suggest a new restroom location
         </p>
@@ -98,8 +98,7 @@
         </button>
 
         <p class="locationHint">
-          For a new restroom, you can also click directly on the map to set the
-          location.
+          For a new restroom, click directly on the map to set the location.
         </p>
       </details>
 
@@ -235,11 +234,7 @@
 
         <label>
           Add a photo
-          <input
-            id="audit_photo"
-            type="file"
-            accept="image/*"
-          />
+          <input id="audit_photo" type="file" accept="image/*" />
 
           <small class="fieldHint">
             Optional. Photos are reviewed with the submission and are not
@@ -260,6 +255,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="./app_map_audit.js?v=2"></script>
+  <script src="./app_map_audit.js?v=3"></script>
 </body>
 </html>
