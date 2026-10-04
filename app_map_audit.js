@@ -3,10 +3,6 @@
 // Blue = Open, Red = Closed, Gray = Unknown
 
 document.addEventListener("DOMContentLoaded", () => {
-  /* =========================================================
-     CONFIG
-     ========================================================= */
-
   const APPS_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxlUzoIYNrVice9e4imFyxny7N8EknWVB13wby8fJKpsl4RkYD_W_PHZ5BhC1XLXiaOow/exec";
 
@@ -17,11 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const RESTROOMS_CSV_URL =
     `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(RESTROOMS_SHEET)}`;
-
-
-  /* =========================================================
-     DOM
-     ========================================================= */
 
   const $ = (id) => document.getElementById(id);
 
@@ -62,12 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const impressionsEl = $("overall_impressions");
   const outsideEl = $("outside_context");
   const notesEl = $("notes");
+  const auditPhotoEl = $("audit_photo");
   const useLocationBtn = $("useLocationBtn");
 
-
-  /* =========================================================
-     HELPERS
-     ========================================================= */
 
   function valueOf(value) {
     return String(value ?? "").trim();
@@ -77,14 +65,109 @@ document.addEventListener("DOMContentLoaded", () => {
     return valueOf(value) !== "";
   }
 
+  function preparePhoto(file) {
+    if (!file) {
+      return Promise.resolve({
+        photo_name: "",
+        photo_type: "",
+        photo_data: "",
+      });
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return Promise.reject(
+        new Error("Please choose an image file.")
+      );
+    }
+
+    if (file.size > 12 * 1024 * 1024) {
+      return Promise.reject(
+        new Error("Please choose an image smaller than 12 MB.")
+      );
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => {
+        reject(
+          new Error("The selected image could not be read.")
+        );
+      };
+
+      reader.onload = () => {
+        const image = new Image();
+
+        image.onerror = () => {
+          reject(
+            new Error(
+              "The selected image could not be processed."
+            )
+          );
+        };
+
+        image.onload = () => {
+          const maxDimension = 1600;
+
+          const scale = Math.min(
+            1,
+            maxDimension /
+              Math.max(image.width, image.height)
+          );
+
+          const canvas =
+            document.createElement("canvas");
+
+          canvas.width = Math.max(
+            1,
+            Math.round(image.width * scale)
+          );
+
+          canvas.height = Math.max(
+            1,
+            Math.round(image.height * scale)
+          );
+
+          const context =
+            canvas.getContext("2d");
+
+          context.drawImage(
+            image,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          resolve({
+            photo_name: file.name,
+            photo_type: "image/jpeg",
+            photo_data: canvas.toDataURL(
+              "image/jpeg",
+              0.78
+            ),
+          });
+        };
+
+        image.src = reader.result;
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
   function esc(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[char]));
+    return String(value ?? "").replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char])
+    );
   }
 
   function isYes(value) {
@@ -95,7 +178,9 @@ document.addEventListener("DOMContentLoaded", () => {
       "yes",
       "y",
       "open",
-    ].includes(valueOf(value).toLowerCase());
+    ].includes(
+      valueOf(value).toLowerCase()
+    );
   }
 
   function isNo(value) {
@@ -107,7 +192,9 @@ document.addEventListener("DOMContentLoaded", () => {
       "n",
       "closed",
       "permanently closed",
-    ].includes(valueOf(value).toLowerCase());
+    ].includes(
+      valueOf(value).toLowerCase()
+    );
   }
 
   function yesNo(value) {
@@ -147,13 +234,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function isMobile() {
-    return window.matchMedia("(max-width: 900px)").matches;
+    return window.matchMedia(
+      "(max-width: 900px)"
+    ).matches;
   }
 
-
-  /* =========================================================
-     MAP
-     ========================================================= */
 
   const map = L.map("map").setView(
     [32.7157, -117.1611],
@@ -164,7 +249,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
+      attribution:
+        "&copy; OpenStreetMap contributors",
     }
   ).addTo(map);
 
@@ -174,10 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let draftMarker = null;
   let restroomRows = [];
 
-
-  /* =========================================================
-     PANEL
-     ========================================================= */
 
   function openAuditPanel() {
     auditPanel.classList.add("open");
@@ -229,7 +311,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!draftMarker) return;
 
     map.removeLayer(draftMarker);
-
     draftMarker = null;
   }
 
@@ -271,7 +352,6 @@ document.addEventListener("DOMContentLoaded", () => {
     "click",
     () => {
       resetForNewAudit();
-
       openAuditPanel();
     }
   );
@@ -298,10 +378,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   );
 
-
-  /* =========================================================
-     STATUS + MARKERS
-     ========================================================= */
 
   function getRestroomStatus(row) {
     const rawStatus =
@@ -433,7 +509,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return `
       <div class="restroomPopup">
-
         <div class="popupTitle">
           ${esc(name)}
         </div>
@@ -475,66 +550,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         <div class="popupDetails">
-
-          ${rowHtml(
-            "Operated by",
-            operatedBy
-          )}
-
-          ${rowHtml(
-            "Access method",
-            accessMethod
-          )}
-
-          ${rowHtml(
-            "Findability",
-            findability
-          )}
-
-          ${rowHtml(
-            "ADA accessible",
-            ada
-          )}
-
-          ${rowHtml(
-            "Gender-neutral",
-            genderNeutral
-          )}
-
-          ${rowHtml(
-            "Menstrual products",
-            menstrualProducts
-          )}
-
-          ${rowHtml(
-            "Showers",
-            showers
-          )}
-
-          ${rowHtml(
-            "Water refill nearby",
-            water
-          )}
-
-          ${rowHtml(
-            "Visible signage",
-            signage
-          )}
-
-          ${rowHtml(
-            "Security cameras",
-            cameras
-          )}
-
-          ${rowHtml(
-            "Baby changing",
-            babyChanging
-          )}
-
+          ${rowHtml("Operated by", operatedBy)}
+          ${rowHtml("Access method", accessMethod)}
+          ${rowHtml("Findability", findability)}
+          ${rowHtml("ADA accessible", ada)}
+          ${rowHtml("Gender-neutral", genderNeutral)}
+          ${rowHtml("Menstrual products", menstrualProducts)}
+          ${rowHtml("Showers", showers)}
+          ${rowHtml("Water refill nearby", water)}
+          ${rowHtml("Visible signage", signage)}
+          ${rowHtml("Security cameras", cameras)}
+          ${rowHtml("Baby changing", babyChanging)}
         </div>
 
         <div class="popupActions">
-
           ${
             googleMapsUrl
               ? `
@@ -557,9 +586,7 @@ document.addEventListener("DOMContentLoaded", () => {
           >
             Suggest a change
           </button>
-
         </div>
-
       </div>
     `;
   }
@@ -627,7 +654,6 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             map.closePopup();
-
             openAuditPanel();
           };
         }
@@ -642,723 +668,4 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     });
 
-    if (bounds.length > 0) {
-      map.fitBounds(
-        bounds,
-        {
-          padding: [35, 35],
-        }
-      );
-    }
-  }
-
-
-  /* =========================================================
-     FORM PREFILL
-     ========================================================= */
-
-  function fillForm(
-    row,
-    mode
-  ) {
-    form.reset();
-
-    if (placeIdEl) {
-      placeIdEl.value =
-        row.globalid ||
-        row.place_id ||
-        "";
-    }
-
-    setMode(mode);
-
-    if (restroomNameEl) {
-      restroomNameEl.value =
-        row.restroom_name ||
-        row.name ||
-        "";
-    }
-
-    if (researcherNameEl) {
-      researcherNameEl.value = "";
-    }
-
-    if (addressEl) {
-      addressEl.value =
-        row.address || "";
-    }
-
-    if (latEl) {
-      latEl.value =
-        row.latitude || "";
-    }
-
-    if (lngEl) {
-      lngEl.value =
-        row.longitude || "";
-    }
-
-    if (openWhenVisitedEl) {
-      openWhenVisitedEl.value =
-        row.open_when_visited ||
-        row.restroom_open_status ||
-        "";
-    }
-
-    if (hoursEl) {
-      hoursEl.value =
-        row.advertised_hours ||
-        "";
-    }
-
-    if (accessMethodEl) {
-      accessMethodEl.value =
-        row.access_method ||
-        "";
-    }
-
-    if (findabilityEl) {
-      findabilityEl.value =
-        row.findability ||
-        "";
-    }
-
-    if (genderNeutralEl) {
-      genderNeutralEl.value =
-        normalizeYesNo(
-          row.gender_neutral
-        );
-    }
-
-    if (menstrualProductsEl) {
-      menstrualProductsEl.value =
-        normalizeYesNo(
-          row.menstrual_products
-        );
-    }
-
-    if (showersEl) {
-      showersEl.value =
-        normalizeYesNo(
-          row.showers_available ||
-          row.showers
-        );
-    }
-
-    if (waterRefillEl) {
-      waterRefillEl.value =
-        normalizeYesNo(
-          row.water_refill_nearby
-        );
-    }
-
-    if (signageEl) {
-      signageEl.value =
-        normalizeYesNo(
-          row.visible_signage
-        );
-    }
-
-    if (camerasEl) {
-      camerasEl.value =
-        normalizeYesNo(
-          row.security_cameras
-        );
-    }
-
-    if (adaEl) {
-      adaEl.value =
-        normalizeYesNo(
-          row.ada_accessible
-        );
-    }
-
-    if (accessBarriersEl) {
-      accessBarriersEl.value =
-        row.access_barriers ||
-        "";
-    }
-
-    if (impressionsEl) {
-      impressionsEl.value =
-        row.overall_impressions ||
-        "";
-    }
-
-    if (outsideEl) {
-      outsideEl.value =
-        row.outside_context ||
-        "";
-    }
-
-    /*
-      Keep the new submission's notes blank.
-
-      This avoids copying existing team-curated notes
-      into the auditor's new submission.
-    */
-    if (notesEl) {
-      notesEl.value = "";
-    }
-
-    /*
-      New audit should use the current auditor's
-      own date/time, not the previous assessment date.
-    */
-    if (auditDatetimeEl) {
-      auditDatetimeEl.value = "";
-    }
-
-    statusEl.textContent = "";
-  }
-
-
-  /* =========================================================
-     MAP CLICK FOR NEW RESTROOM
-     ========================================================= */
-
-  map.on(
-    "click",
-    (event) => {
-      /*
-        Map clicks only create a new draft location
-        if the audit panel is open and the user is
-        currently creating a new restroom.
-      */
-
-      if (
-        !auditPanel.classList.contains(
-          "open"
-        )
-      ) {
-        return;
-      }
-
-      if (
-        valueOf(
-          actionEl.value
-        ).toLowerCase() !== "new"
-      ) {
-        return;
-      }
-
-      const lat =
-        event.latlng.lat;
-
-      const lng =
-        event.latlng.lng;
-
-      if (latEl) {
-        latEl.value =
-          lat.toFixed(6);
-      }
-
-      if (lngEl) {
-        lngEl.value =
-          lng.toFixed(6);
-      }
-
-      setDraftMarker(
-        lat,
-        lng
-      );
-    }
-  );
-
-
-  /* =========================================================
-     GPS
-     ========================================================= */
-
-  if (
-    useLocationBtn &&
-    "geolocation" in navigator
-  ) {
-    useLocationBtn.addEventListener(
-      "click",
-      () => {
-        useLocationBtn.disabled =
-          true;
-
-        useLocationBtn.textContent =
-          "Locating…";
-
-        navigator.geolocation
-          .getCurrentPosition(
-
-            (position) => {
-              const lat =
-                position.coords.latitude;
-
-              const lng =
-                position.coords.longitude;
-
-              map.setView(
-                [lat, lng],
-                17
-              );
-
-              if (latEl) {
-                latEl.value =
-                  lat.toFixed(6);
-              }
-
-              if (lngEl) {
-                lngEl.value =
-                  lng.toFixed(6);
-              }
-
-              if (
-                valueOf(
-                  actionEl.value
-                ).toLowerCase() === "new"
-              ) {
-                setDraftMarker(
-                  lat,
-                  lng
-                );
-              }
-
-              useLocationBtn.disabled =
-                false;
-
-              useLocationBtn.textContent =
-                "Use my location";
-            },
-
-            (error) => {
-              console.warn(
-                "Geolocation error:",
-                error
-              );
-
-              alert(
-                "Unable to access your location. You can click the map instead."
-              );
-
-              useLocationBtn.disabled =
-                false;
-
-              useLocationBtn.textContent =
-                "Use my location";
-            },
-
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0,
-            }
-          );
-      }
-    );
-
-  } else if (useLocationBtn) {
-    useLocationBtn.disabled =
-      true;
-
-    useLocationBtn.textContent =
-      "Location not available";
-  }
-
-
-  /* =========================================================
-     SUBMIT
-     ========================================================= */
-
-  form.addEventListener(
-    "submit",
-    async (event) => {
-      event.preventDefault();
-
-      if (
-        !form.reportValidity()
-      ) {
-        const invalid =
-          form.querySelector(
-            ":invalid"
-          );
-
-        if (invalid) {
-          const details =
-            invalid.closest(
-              "details"
-            );
-
-          if (details) {
-            details.open = true;
-          }
-
-          invalid.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-
-          invalid.focus({
-            preventScroll: true,
-          });
-        }
-
-        return;
-      }
-
-      submitBtn.disabled =
-        true;
-
-      submitBtn.textContent =
-        "Submitting…";
-
-      statusEl.textContent =
-        "";
-
-      const payload = {
-
-        place_id:
-          placeIdEl
-            ? placeIdEl.value
-            : "",
-
-        action:
-          actionEl
-            ? actionEl.value
-            : "new",
-
-        audit_datetime:
-          auditDatetimeEl
-            ? auditDatetimeEl.value
-            : "",
-
-        restroom_name:
-          restroomNameEl
-            ? restroomNameEl.value
-            : "",
-
-        researcher_name:
-          researcherNameEl
-            ? researcherNameEl.value
-            : "",
-
-        address:
-          addressEl
-            ? addressEl.value
-            : "",
-
-        latitude:
-          latEl
-            ? latEl.value
-            : "",
-
-        longitude:
-          lngEl
-            ? lngEl.value
-            : "",
-
-        open_when_visited:
-          openWhenVisitedEl
-            ? openWhenVisitedEl.value
-            : "",
-
-        advertised_hours:
-          hoursEl
-            ? hoursEl.value
-            : "",
-
-        access_method:
-          accessMethodEl
-            ? accessMethodEl.value
-            : "",
-
-        findability:
-          findabilityEl
-            ? findabilityEl.value
-            : "",
-
-        gender_neutral:
-          genderNeutralEl
-            ? genderNeutralEl.value
-            : "",
-
-        menstrual_products:
-          menstrualProductsEl
-            ? menstrualProductsEl.value
-            : "",
-
-        showers_available:
-          showersEl
-            ? showersEl.value
-            : "",
-
-        water_refill_nearby:
-          waterRefillEl
-            ? waterRefillEl.value
-            : "",
-
-        visible_signage:
-          signageEl
-            ? signageEl.value
-            : "",
-
-        security_cameras:
-          camerasEl
-            ? camerasEl.value
-            : "",
-
-        ada_accessible:
-          adaEl
-            ? adaEl.value
-            : "",
-
-        access_barriers:
-          accessBarriersEl
-            ? accessBarriersEl.value
-            : "",
-
-        overall_impressions:
-          impressionsEl
-            ? impressionsEl.value
-            : "",
-
-        outside_context:
-          outsideEl
-            ? outsideEl.value
-            : "",
-
-        notes:
-          notesEl
-            ? notesEl.value
-            : "",
-      };
-
-      try {
-        const response =
-          await fetch(
-            APPS_SCRIPT_URL,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "text/plain;charset=utf-8",
-              },
-
-              body:
-                JSON.stringify(
-                  payload
-                ),
-            }
-          );
-
-        if (!response.ok) {
-          throw new Error(
-            `Submission failed. HTTP ${response.status}`
-          );
-        }
-
-        let result = null;
-
-        try {
-          result =
-            await response.json();
-        } catch (_) {}
-
-        if (
-          result &&
-          result.success === false
-        ) {
-          throw new Error(
-            result.error ||
-            "Submission rejected."
-          );
-        }
-
-        statusEl.textContent =
-          "Submitted ✓ Your audit is awaiting review.";
-
-        clearDraftMarker();
-
-        /*
-          Keep the success message visible briefly,
-          then reset and close the audit panel.
-        */
-        setTimeout(
-          () => {
-            resetForNewAudit();
-
-            closeAuditPanel();
-          },
-          1200
-        );
-
-      } catch (error) {
-        console.error(
-          "Submission failed:",
-          error
-        );
-
-        statusEl.textContent =
-          "Submit failed. Please check your connection and try again.";
-
-      } finally {
-        submitBtn.disabled =
-          false;
-
-        submitBtn.textContent =
-          "Submit suggestion";
-      }
-    }
-  );
-
-
-  /* =========================================================
-     LEGEND
-     ========================================================= */
-
-  const legend =
-    L.control({
-      position: "bottomright",
-    });
-
-  legend.onAdd =
-    function () {
-      const div =
-        L.DomUtil.create(
-          "div",
-          "mapLegend"
-        );
-
-      div.innerHTML = `
-        <div class="legendTitle">
-          Restroom Status
-        </div>
-
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#2563eb;"
-          ></span>
-          Open
-        </div>
-
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#dc2626;"
-          ></span>
-          Closed
-        </div>
-
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#808080;"
-          ></span>
-          Unknown
-        </div>
-      `;
-
-      L.DomEvent
-        .disableClickPropagation(
-          div
-        );
-
-      return div;
-    };
-
-  legend.addTo(map);
-
-
-  /* =========================================================
-     GOOGLE SHEET LOADING
-     ========================================================= */
-
-  async function loadCsv(url) {
-    const separator =
-      url.includes("?")
-        ? "&"
-        : "?";
-
-    const freshUrl =
-      `${url}${separator}_=${Date.now()}`;
-
-    const response =
-      await fetch(
-        freshUrl,
-        {
-          cache: "no-store",
-        }
-      );
-
-    if (!response.ok) {
-      throw new Error(
-        `Could not load restroom data. HTTP ${response.status}`
-      );
-    }
-
-    const text =
-      await response.text();
-
-    const parsed =
-      Papa.parse(
-        text,
-        {
-          header: true,
-          skipEmptyLines: true,
-        }
-      );
-
-    if (
-      parsed.errors.length
-    ) {
-      console.warn(
-        "CSV parsing warnings:",
-        parsed.errors
-      );
-    }
-
-    return parsed.data;
-  }
-
-  async function initializeMap() {
-    try {
-      restroomRows =
-        await loadCsv(
-          RESTROOMS_CSV_URL
-        );
-
-      drawMarkers(
-        restroomRows
-      );
-
-      setTimeout(
-        () => {
-          map.invalidateSize();
-        },
-        200
-      );
-
-    } catch (error) {
-      console.error(
-        "Failed to load restrooms_editable from Google Sheets:",
-        error
-      );
-    }
-  }
-
-
-  /* =========================================================
-     START
-     ========================================================= */
-
-  initializeMap();
-
-  window.addEventListener(
-    "resize",
-    () => {
-      setTimeout(
-        () => {
-          map.invalidateSize();
-        },
-        100
-      );
-    }
-  );
-});
+    if (bounds
