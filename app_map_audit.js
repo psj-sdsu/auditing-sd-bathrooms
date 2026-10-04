@@ -1,7 +1,3 @@
-// app_map_audit.js
-// Full-screen restroom map + button-triggered audit panel
-// Blue = Open, Red = Closed, Gray = Unknown
-
 document.addEventListener("DOMContentLoaded", () => {
   const APPS_SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxlUzoIYNrVice9e4imFyxny7N8EknWVB13wby8fJKpsl4RkYD_W_PHZ5BhC1XLXiaOow/exec";
@@ -16,11 +12,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const $ = (id) => document.getElementById(id);
 
-  const auditPanel = $("auditPanel");
-  const panelBackdrop = $("panelBackdrop");
-  const startAuditBtn = $("startAuditBtn");
-  const closeAuditBtn = $("closeAuditBtn");
+  const map = L.map("map").setView(
+    [32.7157, -117.1611],
+    11
+  );
 
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }
+  ).addTo(map);
+
+  const markers = L.layerGroup().addTo(map);
+
+  const panel = $("auditPanel");
+  const backdrop = $("panelBackdrop");
   const form = $("surveyForm");
   const submitBtn = $("submitBtn");
   const statusEl = $("status");
@@ -28,41 +36,236 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const placeIdEl = $("place_id");
   const actionEl = $("action");
+  const photoEl = $("audit_photo");
 
-  const auditDatetimeEl = $("audit_datetime");
-  const restroomNameEl = $("restroom_name");
-  const researcherNameEl = $("researcher_name");
-  const addressEl = $("address");
-  const latEl = $("latitude");
-  const lngEl = $("longitude");
+  let draftMarker = null;
 
-  const openWhenVisitedEl = $("open_when_visited");
-  const hoursEl = $("advertised_hours");
-  const accessMethodEl = $("access_method");
-  const findabilityEl = $("findability");
-
-  const genderNeutralEl = $("gender_neutral");
-  const menstrualProductsEl = $("menstrual_products");
-  const showersEl = $("showers_available");
-  const waterRefillEl = $("water_refill_nearby");
-  const signageEl = $("visible_signage");
-  const camerasEl = $("security_cameras");
-  const adaEl = $("ada_accessible");
-
-  const accessBarriersEl = $("access_barriers");
-  const impressionsEl = $("overall_impressions");
-  const outsideEl = $("outside_context");
-  const notesEl = $("notes");
-  const auditPhotoEl = $("audit_photo");
-  const useLocationBtn = $("useLocationBtn");
-
-
-  function valueOf(value) {
-    return String(value ?? "").trim();
+  function value(id) {
+    const element = $(id);
+    return element ? element.value.trim() : "";
   }
 
-  function hasValue(value) {
-    return valueOf(value) !== "";
+  function setValue(id, value) {
+    const element = $(id);
+    if (element) element.value = value || "";
+  }
+
+  function isYes(value) {
+    return [
+      "yes",
+      "true",
+      "1",
+      "1.0",
+      "open"
+    ].includes(
+      String(value || "").trim().toLowerCase()
+    );
+  }
+
+  function isNo(value) {
+    return [
+      "no",
+      "false",
+      "0",
+      "0.0",
+      "closed",
+      "permanently closed"
+    ].includes(
+      String(value || "").trim().toLowerCase()
+    );
+  }
+
+  function yesNo(value) {
+    if (!value) return "";
+    if (isYes(value)) return "Yes";
+    if (isNo(value)) return "No";
+    return value;
+  }
+
+  function escapeHtml(value) {
+    return String(value || "").replace(
+      /[&<>"']/g,
+      (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[character])
+    );
+  }
+
+  function statusFor(row) {
+    const status =
+      row.open_when_visited ||
+      row.restroom_open_status ||
+      "";
+
+    if (isYes(status)) return "open";
+    if (isNo(status)) return "closed";
+
+    return "unknown";
+  }
+
+  function statusLabel(row) {
+    const status = statusFor(row);
+
+    if (status === "open") return "Open";
+    if (status === "closed") return "Closed";
+
+    return "Unknown";
+  }
+
+  function statusColor(row) {
+    const status = statusFor(row);
+
+    if (status === "open") return "#2563eb";
+    if (status === "closed") return "#dc2626";
+
+    return "#808080";
+  }
+
+  function openPanel() {
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+    backdrop.hidden = false;
+    setTimeout(() => map.invalidateSize(), 250);
+  }
+
+  function closePanel() {
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+    backdrop.hidden = true;
+    setTimeout(() => map.invalidateSize(), 250);
+  }
+
+  function clearDraftMarker() {
+    if (draftMarker) {
+      map.removeLayer(draftMarker);
+      draftMarker = null;
+    }
+  }
+
+  function setDraftMarker(lat, lng) {
+    clearDraftMarker();
+
+    draftMarker = L.marker([lat, lng])
+      .addTo(map)
+      .bindPopup("New restroom location")
+      .openPopup();
+  }
+
+  function setMode(mode) {
+    actionEl.value = mode;
+
+    modeIndicator.textContent =
+      mode === "update"
+        ? "Suggest a change to this restroom"
+        : "Suggest a new restroom location";
+  }
+
+  function resetForm() {
+    form.reset();
+    placeIdEl.value = "";
+    actionEl.value = "new";
+    setMode("new");
+    statusEl.textContent = "";
+    clearDraftMarker();
+  }
+
+  function fillForm(row) {
+    form.reset();
+
+    placeIdEl.value =
+      row.globalid ||
+      row.place_id ||
+      "";
+
+    actionEl.value = "update";
+    setMode("update");
+
+    setValue(
+      "restroom_name",
+      row.restroom_name || row.name
+    );
+
+    setValue("address", row.address);
+    setValue("latitude", row.latitude);
+    setValue("longitude", row.longitude);
+    setValue(
+      "open_when_visited",
+      row.open_when_visited ||
+      row.restroom_open_status
+    );
+
+    setValue(
+      "advertised_hours",
+      row.advertised_hours
+    );
+
+    setValue(
+      "access_method",
+      row.access_method
+    );
+
+    setValue(
+      "findability",
+      row.findability
+    );
+
+    setValue(
+      "gender_neutral",
+      yesNo(row.gender_neutral)
+    );
+
+    setValue(
+      "menstrual_products",
+      yesNo(row.menstrual_products)
+    );
+
+    setValue(
+      "showers_available",
+      yesNo(row.showers_available || row.showers)
+    );
+
+    setValue(
+      "water_refill_nearby",
+      yesNo(row.water_refill_nearby)
+    );
+
+    setValue(
+      "visible_signage",
+      yesNo(row.visible_signage)
+    );
+
+    setValue(
+      "security_cameras",
+      yesNo(row.security_cameras)
+    );
+
+    setValue(
+      "ada_accessible",
+      yesNo(row.ada_accessible)
+    );
+
+    setValue(
+      "access_barriers",
+      row.access_barriers
+    );
+
+    setValue(
+      "overall_impressions",
+      row.overall_impressions
+    );
+
+    setValue(
+      "outside_context",
+      row.outside_context
+    );
+
+    setValue("notes", "");
+    setValue("audit_datetime", "");
+    statusEl.textContent = "";
   }
 
   function preparePhoto(file) {
@@ -70,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return Promise.resolve({
         photo_name: "",
         photo_type: "",
-        photo_data: "",
+        photo_data: ""
       });
     }
 
@@ -100,18 +303,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         image.onerror = () => {
           reject(
-            new Error(
-              "The selected image could not be processed."
-            )
+            new Error("The selected image could not be processed.")
           );
         };
 
         image.onload = () => {
-          const maxDimension = 1600;
-
+          const maximum = 1600;
           const scale = Math.min(
             1,
-            maxDimension /
+            maximum /
               Math.max(image.width, image.height)
           );
 
@@ -145,7 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
             photo_data: canvas.toDataURL(
               "image/jpeg",
               0.78
-            ),
+            )
           });
         };
 
@@ -156,350 +356,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function esc(value) {
-    return String(value ?? "").replace(
-      /[&<>"']/g,
-      (char) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        }[char])
-    );
-  }
-
-  function isYes(value) {
-    return [
-      "1",
-      "1.0",
-      "true",
-      "yes",
-      "y",
-      "open",
-    ].includes(
-      valueOf(value).toLowerCase()
-    );
-  }
-
-  function isNo(value) {
-    return [
-      "0",
-      "0.0",
-      "false",
-      "no",
-      "n",
-      "closed",
-      "permanently closed",
-    ].includes(
-      valueOf(value).toLowerCase()
-    );
-  }
-
-  function yesNo(value) {
-    if (!hasValue(value)) return "";
-
-    if (isYes(value)) return "Yes";
-    if (isNo(value)) return "No";
-
-    return valueOf(value);
-  }
-
-  function normalizeYesNo(value) {
-    if (!hasValue(value)) return "";
-
-    if (isYes(value)) return "Yes";
-    if (isNo(value)) return "No";
-
-    return valueOf(value);
-  }
-
-  function formatDate(value) {
-    const raw = valueOf(value);
-
-    if (!raw) return "";
-
-    const date = new Date(raw);
-
-    if (Number.isNaN(date.getTime())) {
-      return raw;
-    }
-
-    return date.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-
-  function isMobile() {
-    return window.matchMedia(
-      "(max-width: 900px)"
-    ).matches;
-  }
-
-
-  const map = L.map("map").setView(
-    [32.7157, -117.1611],
-    11
-  );
-
-  L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-      maxZoom: 19,
-      attribution:
-        "&copy; OpenStreetMap contributors",
-    }
-  ).addTo(map);
-
-  const restroomMarkers =
-    L.layerGroup().addTo(map);
-
-  let draftMarker = null;
-  let restroomRows = [];
-
-
-  function openAuditPanel() {
-    auditPanel.classList.add("open");
-
-    auditPanel.setAttribute(
-      "aria-hidden",
-      "false"
-    );
-
-    if (isMobile()) {
-      panelBackdrop.hidden = false;
-    }
-
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 220);
-  }
-
-  function closeAuditPanel() {
-    auditPanel.classList.remove("open");
-
-    auditPanel.setAttribute(
-      "aria-hidden",
-      "true"
-    );
-
-    panelBackdrop.hidden = true;
-
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 220);
-  }
-
-  function setMode(mode) {
-    if (actionEl) {
-      actionEl.value = mode;
-    }
-
-    if (mode === "update") {
-      modeIndicator.textContent =
-        "Suggest a change to this restroom";
-    } else {
-      modeIndicator.textContent =
-        "Suggest a new restroom location";
-    }
-  }
-
-  function clearDraftMarker() {
-    if (!draftMarker) return;
-
-    map.removeLayer(draftMarker);
-    draftMarker = null;
-  }
-
-  function setDraftMarker(lat, lng) {
-    clearDraftMarker();
-
-    draftMarker = L.marker(
-      [lat, lng],
-      {
-        keyboard: false,
-        zIndexOffset: 2000,
-      }
-    ).addTo(map);
-
-    draftMarker
-      .bindPopup("New restroom location")
-      .openPopup();
-  }
-
-  function resetForNewAudit() {
-    form.reset();
-
-    if (placeIdEl) {
-      placeIdEl.value = "";
-    }
-
-    if (actionEl) {
-      actionEl.value = "new";
-    }
-
-    setMode("new");
-
-    statusEl.textContent = "";
-
-    clearDraftMarker();
-  }
-
-  startAuditBtn.addEventListener(
-    "click",
-    () => {
-      resetForNewAudit();
-      openAuditPanel();
-    }
-  );
-
-  closeAuditBtn.addEventListener(
-    "click",
-    closeAuditPanel
-  );
-
-  panelBackdrop.addEventListener(
-    "click",
-    closeAuditPanel
-  );
-
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (
-        event.key === "Escape" &&
-        auditPanel.classList.contains("open")
-      ) {
-        closeAuditPanel();
-      }
-    }
-  );
-
-
-  function getRestroomStatus(row) {
-    const rawStatus =
-      hasValue(row.open_when_visited)
-        ? row.open_when_visited
-        : row.restroom_open_status;
-
-    if (isYes(rawStatus)) {
-      return "open";
-    }
-
-    if (isNo(rawStatus)) {
-      return "closed";
-    }
-
-    return "unknown";
-  }
-
-  function getStatusLabel(row) {
-    const status =
-      getRestroomStatus(row);
-
-    if (status === "open") {
-      return "Open";
-    }
-
-    if (status === "closed") {
-      return "Closed";
-    }
-
-    return "Unknown";
-  }
-
-  function getStatusColor(row) {
-    const status =
-      getRestroomStatus(row);
-
-    if (status === "open") {
-      return "#2563eb";
-    }
-
-    if (status === "closed") {
-      return "#dc2626";
-    }
-
-    return "#808080";
-  }
-
   function popupHtml(row) {
     const name =
-      valueOf(row.restroom_name) ||
-      valueOf(row.name) ||
+      row.name ||
+      row.restroom_name ||
       "Public Restroom";
 
     const address =
-      valueOf(row.address);
-
-    const status =
-      getStatusLabel(row);
+      row.address || "";
 
     const hours =
-      valueOf(row.advertised_hours);
-
-    const operatedBy =
-      valueOf(row.operated_by);
-
-    const accessMethod =
-      valueOf(row.access_method);
-
-    const findability =
-      valueOf(row.findability);
-
-    const ada =
-      yesNo(row.ada_accessible);
-
-    const genderNeutral =
-      yesNo(row.gender_neutral);
-
-    const menstrualProducts =
-      yesNo(row.menstrual_products);
-
-    const showers =
-      yesNo(
-        row.showers_available ||
-        row.showers
-      );
-
-    const water =
-      yesNo(row.water_refill_nearby);
-
-    const signage =
-      yesNo(row.visible_signage);
-
-    const cameras =
-      yesNo(row.security_cameras);
-
-    const babyChanging =
-      yesNo(row.baby_changing);
-
-    const assessmentDate =
-      formatDate(
-        row.audit_datetime ||
-        row.restroom_assessment_date ||
-        row.timestamp
-      );
-
-    function rowHtml(label, value) {
-      if (!hasValue(value)) {
-        return "";
-      }
-
-      return `
-        <div class="popupRow">
-          <strong>${esc(label)}:</strong>
-          ${esc(value)}
-        </div>
-      `;
-    }
+      row.advertised_hours || "";
 
     const googleMapsUrl =
-      hasValue(row.latitude) &&
-      hasValue(row.longitude)
+      row.latitude &&
+      row.longitude
         ? `https://www.google.com/maps?q=${encodeURIComponent(
             row.latitude
           )},${encodeURIComponent(
@@ -510,21 +381,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return `
       <div class="restroomPopup">
         <div class="popupTitle">
-          ${esc(name)}
+          ${escapeHtml(name)}
         </div>
 
         ${
           address
             ? `
               <div class="popupAddress">
-                ${esc(address)}
+                ${escapeHtml(address)}
               </div>
             `
             : ""
         }
 
-        <div class="popupStatus popupStatus-${getRestroomStatus(row)}">
-          ${esc(status)}
+        <div class="popupStatus popupStatus-${statusFor(row)}">
+          ${statusLabel(row)}
         </div>
 
         ${
@@ -532,36 +403,11 @@ document.addEventListener("DOMContentLoaded", () => {
             ? `
               <div class="popupHours">
                 <strong>Hours:</strong>
-                ${esc(hours)}
+                ${escapeHtml(hours)}
               </div>
             `
             : ""
         }
-
-        ${
-          assessmentDate
-            ? `
-              <div class="popupDate">
-                Last assessed:
-                ${esc(assessmentDate)}
-              </div>
-            `
-            : ""
-        }
-
-        <div class="popupDetails">
-          ${rowHtml("Operated by", operatedBy)}
-          ${rowHtml("Access method", accessMethod)}
-          ${rowHtml("Findability", findability)}
-          ${rowHtml("ADA accessible", ada)}
-          ${rowHtml("Gender-neutral", genderNeutral)}
-          ${rowHtml("Menstrual products", menstrualProducts)}
-          ${rowHtml("Showers", showers)}
-          ${rowHtml("Water refill nearby", water)}
-          ${rowHtml("Visible signage", signage)}
-          ${rowHtml("Security cameras", cameras)}
-          ${rowHtml("Baby changing", babyChanging)}
-        </div>
 
         <div class="popupActions">
           ${
@@ -592,82 +438,371 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function drawMarkers(rows) {
-    restroomMarkers.clearLayers();
+    markers.clearLayers();
 
     const bounds = [];
 
     rows.forEach((row) => {
-      const lat =
+      const latitude =
         parseFloat(row.latitude);
 
-      const lng =
+      const longitude =
         parseFloat(row.longitude);
 
       if (
-        Number.isNaN(lat) ||
-        Number.isNaN(lng)
+        Number.isNaN(latitude) ||
+        Number.isNaN(longitude)
       ) {
         return;
       }
 
       const marker =
         L.circleMarker(
-          [lat, lng],
+          [latitude, longitude],
           {
             radius: 7,
             color: "#ffffff",
             weight: 2,
-            fillColor:
-              getStatusColor(row),
-            fillOpacity: 0.92,
+            fillColor: statusColor(row),
+            fillOpacity: 0.92
           }
         );
 
       marker.bindPopup(
         popupHtml(row),
         {
-          maxWidth: 380,
+          maxWidth: 380
         }
       );
 
       marker.on(
         "popupopen",
         (event) => {
-          const popupRoot =
-            event.popup.getElement();
-
-          if (!popupRoot) return;
-
           const button =
-            popupRoot.querySelector(
-              "[data-audit-update]"
-            );
+            event.popup
+              .getElement()
+              ?.querySelector(
+                "[data-audit-update]"
+              );
 
           if (!button) return;
 
           button.onclick = () => {
-            clearDraftMarker();
-
-            fillForm(
-              row,
-              "update"
-            );
-
             map.closePopup();
-            openAuditPanel();
+            fillForm(row);
+            openPanel();
           };
         }
       );
 
-      marker.addTo(
-        restroomMarkers
-      );
-
-      bounds.push(
-        [lat, lng]
-      );
+      marker.addTo(markers);
+      bounds.push([latitude, longitude]);
     });
 
-    if (bounds
-        });
+    if (bounds.length) {
+      map.fitBounds(
+        bounds,
+        {
+          padding: [35, 35]
+        }
+      );
+    }
+  }
 
+  async function loadRestrooms() {
+    const response =
+      await fetch(
+        `${RESTROOMS_CSV_URL}&_=${Date.now()}`,
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not load restroom data. HTTP ${response.status}`
+      );
+    }
+
+    const text =
+      await response.text();
+
+    const parsed =
+      Papa.parse(
+        text,
+        {
+          header: true,
+          skipEmptyLines: true
+        }
+      );
+
+    drawMarkers(parsed.data);
+  }
+
+  $("startAuditBtn").addEventListener(
+    "click",
+    () => {
+      resetForm();
+      openPanel();
+    }
+  );
+
+  $("closeAuditBtn").addEventListener(
+    "click",
+    closePanel
+  );
+
+  backdrop.addEventListener(
+    "click",
+    closePanel
+  );
+
+  map.on(
+    "click",
+    (event) => {
+      if (
+        !panel.classList.contains("open") ||
+        actionEl.value !== "new"
+      ) {
+        return;
+      }
+
+      const latitude =
+        event.latlng.lat;
+
+      const longitude =
+        event.latlng.lng;
+
+      setValue(
+        "latitude",
+        latitude.toFixed(6)
+      );
+
+      setValue(
+        "longitude",
+        longitude.toFixed(6)
+      );
+
+      setDraftMarker(
+        latitude,
+        longitude
+      );
+    }
+  );
+
+  $("useLocationBtn").addEventListener(
+    "click",
+    () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latitude =
+            position.coords.latitude;
+
+          const longitude =
+            position.coords.longitude;
+
+          map.setView(
+            [latitude, longitude],
+            17
+          );
+
+          setValue(
+            "latitude",
+            latitude.toFixed(6)
+          );
+
+          setValue(
+            "longitude",
+            longitude.toFixed(6)
+          );
+
+          if (actionEl.value === "new") {
+            setDraftMarker(
+              latitude,
+              longitude
+            );
+          }
+        },
+        () => {
+          alert(
+            "Unable to access your location. You can click the map instead."
+          );
+        }
+      );
+    }
+  );
+
+  form.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+
+      if (!form.reportValidity()) {
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting…";
+      statusEl.textContent = "";
+
+      let photo;
+
+      try {
+        photo = await preparePhoto(
+          photoEl.files[0]
+        );
+      } catch (error) {
+        statusEl.textContent =
+          error.message;
+
+        submitBtn.disabled = false;
+        submitBtn.textContent =
+          "Submit suggestion";
+
+        return;
+      }
+
+      const payload = {
+        record_type: "restroom",
+        place_id: value("place_id"),
+        action: value("action"),
+        audit_datetime: value("audit_datetime"),
+        restroom_name: value("restroom_name"),
+        researcher_name: value("researcher_name"),
+        address: value("address"),
+        latitude: value("latitude"),
+        longitude: value("longitude"),
+        open_when_visited: value("open_when_visited"),
+        advertised_hours: value("advertised_hours"),
+        access_method: value("access_method"),
+        findability: value("findability"),
+        gender_neutral: value("gender_neutral"),
+        menstrual_products: value("menstrual_products"),
+        showers_available: value("showers_available"),
+        water_refill_nearby: value("water_refill_nearby"),
+        visible_signage: value("visible_signage"),
+        security_cameras: value("security_cameras"),
+        ada_accessible: value("ada_accessible"),
+        access_barriers: value("access_barriers"),
+        overall_impressions: value("overall_impressions"),
+        outside_context: value("outside_context"),
+        notes: value("notes"),
+        photo_name: photo.photo_name,
+        photo_type: photo.photo_type,
+        photo_data: photo.photo_data
+      };
+
+      try {
+        const response =
+          await fetch(
+            APPS_SCRIPT_URL,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "text/plain;charset=utf-8"
+              },
+              body: JSON.stringify(payload)
+            }
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            `Submission failed. HTTP ${response.status}`
+          );
+        }
+
+        const result =
+          await response.json();
+
+        if (
+          result &&
+          result.success === false
+        ) {
+          throw new Error(
+            result.error ||
+            "Submission rejected."
+          );
+        }
+
+        statusEl.textContent =
+          "Submitted ✓ Your audit is awaiting review.";
+
+        setTimeout(
+          () => {
+            resetForm();
+            closePanel();
+          },
+          1200
+        );
+
+      } catch (error) {
+        console.error(error);
+
+        statusEl.textContent =
+          "Submit failed. Please check your connection and try again.";
+
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent =
+          "Submit suggestion";
+      }
+    }
+  );
+
+  const legend =
+    L.control({
+      position: "bottomright"
+    });
+
+  legend.onAdd =
+    () => {
+      const div =
+        L.DomUtil.create(
+          "div",
+          "mapLegend"
+        );
+
+      div.innerHTML = `
+        <div class="legendTitle">
+          Restroom Status
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#2563eb"
+          ></span>
+          Open
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#dc2626"
+          ></span>
+          Closed
+        </div>
+
+        <div class="legendItem">
+          <span
+            class="legendDot"
+            style="background:#808080"
+          ></span>
+          Unknown
+        </div>
+      `;
+
+      L.DomEvent.disableClickPropagation(div);
+
+      return div;
+    };
+
+  legend.addTo(map);
+
+  loadRestrooms().catch(
+    (error) => {
+      console.error(error);
+    }
+  );
+});
