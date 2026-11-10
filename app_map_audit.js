@@ -268,20 +268,53 @@ document.addEventListener("DOMContentLoaded", () => {
     statusEl.textContent = "";
   }
 
-  function preparePhoto(file) {
-    if (!file) return Promise.resolve(null);
+function preparePhoto(file) {
+  if (!file) {
+    return Promise.resolve(null);
+  }
 
-    if (!file.type.startsWith("image/")) {
-      return Promise.reject(
-        new Error("Please choose an image file.")
-      );
-    }
+  if (
+    !file.type ||
+    !file.type.startsWith("image/")
+  ) {
+    return Promise.reject(
+      new Error(
+        `${file.name} is not a supported image file.`
+      )
+    );
+  }
 
-    if (file.size > 12 * 1024 * 1024) {
-      return Promise.reject(
-        new Error("Please choose an image smaller than 12 MB.")
+  if (file.size > 10 * 1024 * 1024) {
+    return Promise.reject(
+      new Error(
+        `${file.name} is larger than 10 MB.`
+      )
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      reject(
+        new Error(
+          `Could not read ${file.name}.`
+        )
       );
-    }
+    };
+
+    reader.onload = () => {
+      resolve({
+        photo_name: file.name,
+        photo_type:
+          file.type || "image/jpeg",
+        photo_data: reader.result
+      });
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
 
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
