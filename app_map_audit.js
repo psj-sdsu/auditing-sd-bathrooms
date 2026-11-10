@@ -1,16 +1,20 @@
 document.addEventListener("DOMContentLoaded", () => {
   const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyIg5O0NBst7ICf8XgIsMh1U64w5vELk7jCYQeGVxqnNY0hsMKPqoVjDhZ3zojQTRCrZA/exec";
+    "https://script.google.com/macros/s/AKfycbyIg5O0NBst7ICf8XgIsMh1U64w5vELk7jCYQeGVxqnNY0hsMKPqoVjDhZ3zojQTRCrZA/exec";
 
   const SPREADSHEET_ID =
     "1jb6Oi_8Ldmj9tJdjuBsDJDJ0jRNhPSN3-CUaCLrPyR0";
 
-  const RESTROOMS_SHEET = "restrooms_editable";
+  const RESTROOMS_SHEET =
+    "restrooms_editable";
 
   const RESTROOMS_CSV_URL =
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(RESTROOMS_SHEET)}`;
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      RESTROOMS_SHEET
+    )}`;
 
-  const $ = (id) => document.getElementById(id);
+  const $ = (id) =>
+    document.getElementById(id);
 
   const map = L.map("map").setView(
     [32.7157, -117.1611],
@@ -21,18 +25,21 @@ document.addEventListener("DOMContentLoaded", () => {
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution:
+        "&copy; OpenStreetMap contributors"
     }
   ).addTo(map);
 
-  const markers = L.layerGroup().addTo(map);
+  const markers =
+    L.layerGroup().addTo(map);
 
   const panel = $("auditPanel");
   const backdrop = $("panelBackdrop");
   const form = $("surveyForm");
   const submitBtn = $("submitBtn");
   const statusEl = $("status");
-  const modeIndicator = $("modeIndicator");
+  const modeIndicator =
+    $("modeIndicator");
 
   const placeIdEl = $("place_id");
   const actionEl = $("action");
@@ -40,17 +47,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let draftMarker = null;
 
+
   function value(id) {
     const element = $(id);
-    return element ? element.value.trim() : "";
+    return element
+      ? element.value.trim()
+      : "";
   }
 
-  function setValue(id, value) {
+
+  function setValue(id, newValue) {
     const element = $(id);
-    if (element) element.value = value || "";
+
+    if (element) {
+      element.value = newValue || "";
+    }
   }
 
-  function isYes(value) {
+
+  function isYes(input) {
     return [
       "yes",
       "true",
@@ -58,11 +73,14 @@ document.addEventListener("DOMContentLoaded", () => {
       "1.0",
       "open"
     ].includes(
-      String(value || "").trim().toLowerCase()
+      String(input || "")
+        .trim()
+        .toLowerCase()
     );
   }
 
-  function isNo(value) {
+
+  function isNo(input) {
     return [
       "no",
       "false",
@@ -71,19 +89,23 @@ document.addEventListener("DOMContentLoaded", () => {
       "closed",
       "permanently closed"
     ].includes(
-      String(value || "").trim().toLowerCase()
+      String(input || "")
+        .trim()
+        .toLowerCase()
     );
   }
 
-  function yesNo(value) {
-    if (!value) return "";
-    if (isYes(value)) return "Yes";
-    if (isNo(value)) return "No";
-    return value;
+
+  function yesNo(input) {
+    if (!input) return "";
+    if (isYes(input)) return "Yes";
+    if (isNo(input)) return "No";
+    return input;
   }
 
-  function escapeHtml(value) {
-    return String(value || "").replace(
+
+  function escapeHtml(input) {
+    return String(input || "").replace(
       /[&<>"']/g,
       (character) => ({
         "&": "&amp;",
@@ -94,6 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }[character])
     );
   }
+
 
   function statusFor(row) {
     const status =
@@ -107,37 +130,68 @@ document.addEventListener("DOMContentLoaded", () => {
     return "unknown";
   }
 
+
   function statusLabel(row) {
     const status = statusFor(row);
 
-    if (status === "open") return "Open";
-    if (status === "closed") return "Closed";
+    if (status === "open") {
+      return "Open";
+    }
+
+    if (status === "closed") {
+      return "Closed";
+    }
 
     return "Unknown";
   }
 
+
   function statusColor(row) {
     const status = statusFor(row);
 
-    if (status === "open") return "#2563eb";
-    if (status === "closed") return "#dc2626";
+    if (status === "open") {
+      return "#2563eb";
+    }
+
+    if (status === "closed") {
+      return "#dc2626";
+    }
 
     return "#808080";
   }
 
+
   function openPanel() {
     panel.classList.add("open");
-    panel.setAttribute("aria-hidden", "false");
+
+    panel.setAttribute(
+      "aria-hidden",
+      "false"
+    );
+
     backdrop.hidden = false;
-    setTimeout(() => map.invalidateSize(), 250);
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
   }
+
 
   function closePanel() {
     panel.classList.remove("open");
-    panel.setAttribute("aria-hidden", "true");
+
+    panel.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
     backdrop.hidden = true;
-    setTimeout(() => map.invalidateSize(), 250);
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
   }
+
 
   function clearDraftMarker() {
     if (draftMarker) {
@@ -146,14 +200,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function setDraftMarker(lat, lng) {
+
+  function setDraftMarker(
+    latitude,
+    longitude
+  ) {
     clearDraftMarker();
 
-    draftMarker = L.marker([lat, lng])
+    draftMarker = L.marker([
+      latitude,
+      longitude
+    ])
       .addTo(map)
-      .bindPopup("New restroom location")
+      .bindPopup(
+        "New restroom location"
+      )
       .openPopup();
   }
+
 
   function setMode(mode) {
     actionEl.value = mode;
@@ -164,6 +228,7 @@ document.addEventListener("DOMContentLoaded", () => {
         : "Suggest a new restroom location";
   }
 
+
   function resetForm() {
     form.reset();
     placeIdEl.value = "";
@@ -173,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
     clearDraftMarker();
   }
 
+
   function fillForm(row) {
     form.reset();
 
@@ -181,21 +247,33 @@ document.addEventListener("DOMContentLoaded", () => {
       row.place_id ||
       "";
 
-    actionEl.value = "update";
     setMode("update");
 
     setValue(
       "restroom_name",
-      row.restroom_name || row.name
+      row.restroom_name ||
+        row.name
     );
 
-    setValue("address", row.address);
-    setValue("latitude", row.latitude);
-    setValue("longitude", row.longitude);
+    setValue(
+      "address",
+      row.address
+    );
+
+    setValue(
+      "latitude",
+      row.latitude
+    );
+
+    setValue(
+      "longitude",
+      row.longitude
+    );
+
     setValue(
       "open_when_visited",
       row.open_when_visited ||
-      row.restroom_open_status
+        row.restroom_open_status
     );
 
     setValue(
@@ -225,7 +303,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setValue(
       "showers_available",
-      yesNo(row.showers_available || row.showers)
+      yesNo(
+        row.showers_available ||
+          row.showers
+      )
     );
 
     setValue(
@@ -249,6 +330,21 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
     setValue(
+      "stall_doors",
+      row.stall_doors
+    );
+
+    setValue(
+      "hand_soap",
+      row.hand_soap
+    );
+
+    setValue(
+      "baby_changing_station",
+      row.baby_changing_station
+    );
+
+    setValue(
       "access_barriers",
       row.access_barriers
     );
@@ -265,123 +361,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setValue("notes", "");
     setValue("audit_datetime", "");
+
     statusEl.textContent = "";
   }
 
-function preparePhoto(file) {
-  if (!file) {
-    return Promise.resolve(null);
-  }
 
-  if (
-    !file.type ||
-    !file.type.startsWith("image/")
-  ) {
-    return Promise.reject(
-      new Error(
-        `${file.name} is not a supported image file.`
-      )
-    );
-  }
+  /*
+   * Reads each image directly as a base64
+   * data URL. This avoids the old canvas/
+   * Image conversion problem.
+   */
+  function preparePhoto(file) {
+    if (!file) {
+      return Promise.resolve(null);
+    }
 
-  if (file.size > 10 * 1024 * 1024) {
-    return Promise.reject(
-      new Error(
-        `${file.name} is larger than 10 MB.`
-      )
-    );
-  }
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onerror = () => {
-      reject(
+    if (
+      !file.type ||
+      !file.type.startsWith("image/")
+    ) {
+      return Promise.reject(
         new Error(
-          `Could not read ${file.name}.`
+          `${file.name} is not a supported image file.`
         )
       );
-    };
+    }
 
-    reader.onload = () => {
-      resolve({
-        photo_name: file.name,
-        photo_type:
-          file.type || "image/jpeg",
-        photo_data: reader.result
-      });
-    };
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      return Promise.reject(
+        new Error(
+          `${file.name} is larger than 10 MB.`
+        )
+      );
+    }
 
-    reader.readAsDataURL(file);
-  });
-}
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onerror = () => {
-        reject(
-          new Error("The selected image could not be read.")
-        );
-      };
-
-      reader.onload = () => {
-        const image = new Image();
-
-        image.onerror = () => {
+        reader.onerror = () => {
           reject(
-            new Error("The selected image could not be processed.")
+            new Error(
+              `Could not read ${file.name}.`
+            )
           );
         };
 
-        image.onload = () => {
-          const maximum = 1600;
-          const scale = Math.min(
-            1,
-            maximum /
-              Math.max(image.width, image.height)
-          );
-
-          const canvas =
-            document.createElement("canvas");
-
-          canvas.width = Math.max(
-            1,
-            Math.round(image.width * scale)
-          );
-
-          canvas.height = Math.max(
-            1,
-            Math.round(image.height * scale)
-          );
-
-          const context =
-            canvas.getContext("2d");
-
-          context.drawImage(
-            image,
-            0,
-            0,
-            canvas.width,
-            canvas.height
-          );
-
+        reader.onload = () => {
           resolve({
             photo_name: file.name,
-            photo_type: "image/jpeg",
-            photo_data: canvas.toDataURL(
+            photo_type:
+              file.type ||
               "image/jpeg",
-              0.78
-            )
+            photo_data:
+              reader.result
           });
         };
 
-        image.src = reader.result;
-      };
-
-      reader.readAsDataURL(file);
-    });
+        reader.readAsDataURL(file);
+      }
+    );
   }
+
 
   function popupHtml(row) {
     const name =
@@ -464,6 +509,7 @@ function preparePhoto(file) {
     `;
   }
 
+
   function drawMarkers(rows) {
     markers.clearLayers();
 
@@ -485,7 +531,10 @@ function preparePhoto(file) {
 
       const marker =
         L.circleMarker(
-          [latitude, longitude],
+          [
+            latitude,
+            longitude
+          ],
           {
             radius: 7,
             color: "#ffffff",
@@ -523,7 +572,11 @@ function preparePhoto(file) {
       );
 
       marker.addTo(markers);
-      bounds.push([latitude, longitude]);
+
+      bounds.push([
+        latitude,
+        longitude
+      ]);
     });
 
     if (bounds.length) {
@@ -535,6 +588,7 @@ function preparePhoto(file) {
       );
     }
   }
+
 
   async function loadRestrooms() {
     const response =
@@ -566,6 +620,7 @@ function preparePhoto(file) {
     drawMarkers(parsed.data);
   }
 
+
   $("startAuditBtn").addEventListener(
     "click",
     () => {
@@ -574,15 +629,18 @@ function preparePhoto(file) {
     }
   );
 
+
   $("closeAuditBtn").addEventListener(
     "click",
     closePanel
   );
 
+
   backdrop.addEventListener(
     "click",
     closePanel
   );
+
 
   map.on(
     "click",
@@ -617,6 +675,7 @@ function preparePhoto(file) {
     }
   );
 
+
   $("useLocationBtn").addEventListener(
     "click",
     () => {
@@ -629,7 +688,10 @@ function preparePhoto(file) {
             position.coords.longitude;
 
           map.setView(
-            [latitude, longitude],
+            [
+              latitude,
+              longitude
+            ],
             17
           );
 
@@ -659,6 +721,7 @@ function preparePhoto(file) {
     }
   );
 
+
   form.addEventListener(
     "submit",
     async (event) => {
@@ -669,17 +732,22 @@ function preparePhoto(file) {
       }
 
       submitBtn.disabled = true;
-      submitBtn.textContent = "Submitting…";
+      submitBtn.textContent =
+        "Submitting…";
+
       statusEl.textContent = "";
 
       let photos = [];
 
       try {
-        const selectedFiles = Array.from(
-          photoEl.files || []
-        );
+        const selectedFiles =
+          Array.from(
+            photoEl.files || []
+          );
 
-        if (selectedFiles.length > 5) {
+        if (
+          selectedFiles.length > 5
+        ) {
           throw new Error(
             "Please submit no more than five photos."
           );
@@ -687,9 +755,12 @@ function preparePhoto(file) {
 
         photos = (
           await Promise.all(
-            selectedFiles.map(preparePhoto)
+            selectedFiles.map(
+              preparePhoto
+            )
           )
         ).filter(Boolean);
+
       } catch (error) {
         statusEl.textContent =
           error.message;
@@ -703,34 +774,109 @@ function preparePhoto(file) {
 
       const payload = {
         record_type: "restroom",
-        place_id: value("place_id"),
-        action: value("action"),
-        audit_datetime: value("audit_datetime"),
-        restroom_name: value("restroom_name"),
-        researcher_name: value("researcher_name"),
-        address: value("address"),
-        latitude: value("latitude"),
-        longitude: value("longitude"),
-        open_when_visited: value("open_when_visited"),
-        advertised_hours: value("advertised_hours"),
-        access_method: value("access_method"),
-        findability: value("findability"),
-        gender_neutral: value("gender_neutral"),
-        menstrual_products: value("menstrual_products"),
-        showers_available: value("showers_available"),
-        water_refill_nearby: value("water_refill_nearby"),
-        visible_signage: value("visible_signage"),
-        security_cameras: value("security_cameras"),
-        ada_accessible: value("ada_accessible"),
-        stall_doors: value("stall_doors"),
-        hand_soap: value("hand_soap"),
+
+        place_id:
+          value("place_id"),
+
+        action:
+          value("action"),
+
+        audit_datetime:
+          value("audit_datetime"),
+
+        restroom_name:
+          value("restroom_name"),
+
+        researcher_name:
+          value("researcher_name"),
+
+        address:
+          value("address"),
+
+        latitude:
+          value("latitude"),
+
+        longitude:
+          value("longitude"),
+
+        open_when_visited:
+          value("open_when_visited"),
+
+        advertised_hours:
+          value("advertised_hours"),
+
+        access_method:
+          value("access_method"),
+
+        findability:
+          value("findability"),
+
+        gender_neutral:
+          value("gender_neutral"),
+
+        menstrual_products:
+          value("menstrual_products"),
+
+        showers_available:
+          value("showers_available"),
+
+        water_refill_nearby:
+          value("water_refill_nearby"),
+
+        visible_signage:
+          value("visible_signage"),
+
+        security_cameras:
+          value("security_cameras"),
+
+        ada_accessible:
+          value("ada_accessible"),
+
+        stall_doors:
+          value("stall_doors"),
+
+        hand_soap:
+          value("hand_soap"),
+
         baby_changing_station:
-          value("baby_changing_station"),
-        access_barriers: value("access_barriers"),
-        overall_impressions: value("overall_impressions"),
-        outside_context: value("outside_context"),
-        notes: value("notes"),
-        photos: photos
+          value(
+            "baby_changing_station"
+          ),
+
+        access_barriers:
+          value("access_barriers"),
+
+        overall_impressions:
+          value(
+            "overall_impressions"
+          ),
+
+        outside_context:
+          value("outside_context"),
+
+        notes:
+          value("notes"),
+
+        photos: photos,
+
+        /*
+         * Compatibility with older
+         * Apps Script deployments.
+         */
+        photo_name:
+          photos.length > 0
+            ? photos[0].photo_name
+            : "",
+
+        photo_type:
+          photos.length > 0
+            ? photos[0].photo_type
+            : "",
+
+        photo_data:
+          photos.length > 0
+            ? photos[0].photo_data
+            : ""
       };
 
       try {
@@ -739,11 +885,15 @@ function preparePhoto(file) {
             APPS_SCRIPT_URL,
             {
               method: "POST",
+
               headers: {
                 "Content-Type":
                   "text/plain;charset=utf-8"
               },
-              body: JSON.stringify(payload)
+
+              body: JSON.stringify(
+                payload
+              )
             }
           );
 
@@ -753,8 +903,20 @@ function preparePhoto(file) {
           );
         }
 
-        const result =
-          await response.json();
+        const responseText =
+          await response.text();
+
+        let result;
+
+        try {
+          result =
+            JSON.parse(responseText);
+        } catch {
+          throw new Error(
+            "The web app returned an invalid response: " +
+              responseText
+          );
+        }
 
         if (
           result &&
@@ -762,26 +924,29 @@ function preparePhoto(file) {
         ) {
           throw new Error(
             result.error ||
-            "Submission rejected."
+              "Submission rejected."
           );
         }
 
         statusEl.textContent =
-          "Submitted ✓ Your audit is awaiting review.";
+          photos.length > 0
+            ? "Submitted ✓ Audit and photo uploaded successfully."
+            : "Submitted ✓ Your audit is awaiting review.";
 
         setTimeout(
           () => {
             resetForm();
             closePanel();
           },
-          1200
+          1500
         );
 
       } catch (error) {
         console.error(error);
 
         statusEl.textContent =
-          "Submit failed. Please check your connection and try again.";
+          error.message ||
+          "Submit failed. Please try again.";
 
       } finally {
         submitBtn.disabled = false;
@@ -791,53 +956,55 @@ function preparePhoto(file) {
     }
   );
 
+
   const legend =
     L.control({
       position: "bottomright"
     });
 
-  legend.onAdd =
-    () => {
-      const div =
-        L.DomUtil.create(
-          "div",
-          "mapLegend"
-        );
+  legend.onAdd = () => {
+    const div =
+      L.DomUtil.create(
+        "div",
+        "mapLegend"
+      );
 
-      div.innerHTML = `
-        <div class="legendTitle">
-          Restroom Status
-        </div>
+    div.innerHTML = `
+      <div class="legendTitle">
+        Restroom Status
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#2563eb"
-          ></span>
-          Open
-        </div>
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#2563eb"
+        ></span>
+        Open
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#dc2626"
-          ></span>
-          Closed
-        </div>
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#dc2626"
+        ></span>
+        Closed
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#808080"
-          ></span>
-          Unknown
-        </div>
-      `;
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#808080"
+        ></span>
+        Unknown
+      </div>
+    `;
 
-      L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableClickPropagation(
+      div
+    );
 
-      return div;
-    };
+    return div;
+  };
 
   legend.addTo(map);
 
@@ -847,4 +1014,3 @@ function preparePhoto(file) {
     }
   );
 });
-
