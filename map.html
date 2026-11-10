@@ -1,309 +1,916 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+document.addEventListener("DOMContentLoaded", () => {
+  const APPS_SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbyIg5O0NBst7ICf8XgIsMh1U64w5vELk7jCYQeGVxqnNY0hsMKPqoVjDhZ3zojQTRCrZA/exec";
 
-  <title>Public Restrooms — San Diego</title>
+  const SPREADSHEET_ID =
+    "1jb6Oi_8Ldmj9tJdjuBsDJDJ0jRNhPSN3-CUaCLrPyR0";
 
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
-  />
+  const RESTROOMS_SHEET = "restrooms_editable";
 
-  <link rel="stylesheet" href="./map_audit.css?v=5" />
-</head>
+  const RESTROOMS_CSV_URL =
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      RESTROOMS_SHEET
+    )}`;
 
-<body>
-  <div id="map"></div>
+  const $ = (id) => document.getElementById(id);
 
-  <a class="backHome" href="index.html">
-    ← Project home
-  </a>
+  const map = L.map("map").setView(
+    [32.7157, -117.1611],
+    11
+  );
 
-  <button
-    id="startAuditBtn"
-    class="floatingAuditBtn"
-    type="button"
-  >
-    + Start an Audit
-  </button>
+  L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }
+  ).addTo(map);
 
-  <aside id="auditPanel" aria-hidden="true">
-    <div class="auditPanelHeader">
-      <div>
-        <p class="eyebrow">Project for Sanitation Justice</p>
+  const markers = L.layerGroup().addTo(map);
 
-        <h2 id="auditPanelTitle">
-          Restroom Audit
-        </h2>
+  const panel = $("auditPanel");
+  const backdrop = $("panelBackdrop");
+  const form = $("surveyForm");
+  const submitBtn = $("submitBtn");
+  const statusEl = $("status");
+  const modeIndicator = $("modeIndicator");
 
-        <p id="modeIndicator" class="modeText">
-          Suggest a new restroom location
-        </p>
-      </div>
+  const placeIdEl = $("place_id");
+  const actionEl = $("action");
+  const photoEl = $("audit_photo");
 
-      <button
-        id="closeAuditBtn"
-        class="closeAuditBtn"
-        type="button"
-        aria-label="Close audit form"
-      >
-        ×
-      </button>
-    </div>
+  let draftMarker = null;
 
-    <div class="auditIntro">
-      <p>
-        Select an existing restroom and choose
-        <strong>Suggest a change</strong>, or start a new audit and select a
-        location on the map.
-      </p>
+  function value(id) {
+    const element = $(id);
+    return element
+      ? element.value.trim()
+      : "";
+  }
 
-      <p>
-        All submissions are reviewed before approved changes appear on the map.
-      </p>
-    </div>
+  function setValue(id, newValue) {
+    const element = $(id);
 
-    <form id="surveyForm">
-      <input type="hidden" id="place_id" />
-      <input type="hidden" id="action" value="new" />
+    if (element) {
+      element.value = newValue || "";
+    }
+  }
 
-      <details open>
-        <summary>Basics</summary>
+  function isYes(input) {
+    return [
+      "yes",
+      "true",
+      "1",
+      "1.0",
+      "open"
+    ].includes(
+      String(input || "")
+        .trim()
+        .toLowerCase()
+    );
+  }
 
-        <label>
-          Date and time of audit *
-          <input id="audit_datetime" type="datetime-local" required />
-        </label>
+  function isNo(input) {
+    return [
+      "no",
+      "false",
+      "0",
+      "0.0",
+      "closed",
+      "permanently closed"
+    ].includes(
+      String(input || "")
+        .trim()
+        .toLowerCase()
+    );
+  }
 
-        <label>
-          Name of Restroom *
-          <input id="restroom_name" required />
-        </label>
+  function yesNo(input) {
+    if (!input) return "";
+    if (isYes(input)) return "Yes";
+    if (isNo(input)) return "No";
+    return input;
+  }
 
-        <label>
-          Researcher Name *
-          <input id="researcher_name" required />
-        </label>
+  function escapeHtml(input) {
+    return String(input || "").replace(
+      /[&<>"']/g,
+      (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[character])
+    );
+  }
 
-        <label>
-          Address / Nearby landmark
-          <input id="address" />
-        </label>
+  function statusFor(row) {
+    const status =
+      row.open_when_visited ||
+      row.restroom_open_status ||
+      "";
 
-        <div class="row2">
-          <label>
-            Latitude *
-            <input id="latitude" required />
-          </label>
+    if (isYes(status)) return "open";
+    if (isNo(status)) return "closed";
 
-          <label>
-            Longitude *
-            <input id="longitude" required />
-          </label>
+    return "unknown";
+  }
+
+  function statusLabel(row) {
+    const status = statusFor(row);
+
+    if (status === "open") return "Open";
+    if (status === "closed") return "Closed";
+
+    return "Unknown";
+  }
+
+  function statusColor(row) {
+    const status = statusFor(row);
+
+    if (status === "open") return "#2563eb";
+    if (status === "closed") return "#dc2626";
+
+    return "#808080";
+  }
+
+  function openPanel() {
+    panel.classList.add("open");
+    panel.setAttribute(
+      "aria-hidden",
+      "false"
+    );
+
+    backdrop.hidden = false;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+  }
+
+  function closePanel() {
+    panel.classList.remove("open");
+    panel.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    backdrop.hidden = true;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+  }
+
+  function clearDraftMarker() {
+    if (draftMarker) {
+      map.removeLayer(draftMarker);
+      draftMarker = null;
+    }
+  }
+
+  function setDraftMarker(latitude, longitude) {
+    clearDraftMarker();
+
+    draftMarker = L.marker([
+      latitude,
+      longitude
+    ])
+      .addTo(map)
+      .bindPopup("New restroom location")
+      .openPopup();
+  }
+
+  function setMode(mode) {
+    actionEl.value = mode;
+
+    modeIndicator.textContent =
+      mode === "update"
+        ? "Suggest a change to this restroom"
+        : "Suggest a new restroom location";
+  }
+
+  function resetForm() {
+    form.reset();
+    placeIdEl.value = "";
+    actionEl.value = "new";
+    setMode("new");
+    statusEl.textContent = "";
+    clearDraftMarker();
+  }
+
+  function fillForm(row) {
+    form.reset();
+
+    placeIdEl.value =
+      row.globalid ||
+      row.place_id ||
+      "";
+
+    setMode("update");
+
+    setValue(
+      "restroom_name",
+      row.restroom_name ||
+        row.name
+    );
+
+    setValue("address", row.address);
+    setValue("latitude", row.latitude);
+    setValue("longitude", row.longitude);
+
+    setValue(
+      "open_when_visited",
+      row.open_when_visited ||
+        row.restroom_open_status
+    );
+
+    setValue(
+      "advertised_hours",
+      row.advertised_hours
+    );
+
+    setValue(
+      "access_method",
+      row.access_method
+    );
+
+    setValue(
+      "findability",
+      row.findability
+    );
+
+    setValue(
+      "gender_neutral",
+      yesNo(row.gender_neutral)
+    );
+
+    setValue(
+      "menstrual_products",
+      yesNo(row.menstrual_products)
+    );
+
+    setValue(
+      "showers_available",
+      yesNo(
+        row.showers_available ||
+          row.showers
+      )
+    );
+
+    setValue(
+      "water_refill_nearby",
+      yesNo(row.water_refill_nearby)
+    );
+
+    setValue(
+      "visible_signage",
+      yesNo(row.visible_signage)
+    );
+
+    setValue(
+      "security_cameras",
+      yesNo(row.security_cameras)
+    );
+
+    setValue(
+      "ada_accessible",
+      yesNo(row.ada_accessible)
+    );
+
+    setValue(
+      "stall_doors",
+      row.stall_doors
+    );
+
+    setValue(
+      "hand_soap",
+      row.hand_soap
+    );
+
+    setValue(
+      "baby_changing_station",
+      row.baby_changing_station
+    );
+
+    setValue(
+      "access_barriers",
+      row.access_barriers
+    );
+
+    setValue(
+      "overall_impressions",
+      row.overall_impressions
+    );
+
+    setValue(
+      "outside_context",
+      row.outside_context
+    );
+
+    setValue("notes", "");
+    setValue("audit_datetime", "");
+
+    statusEl.textContent = "";
+  }
+
+  /*
+   * Reads each photo directly as a base64 data URL.
+   * This works with JPG, PNG, and HEIC/HEIF files
+   * when the browser can read them.
+   */
+  function preparePhoto(file) {
+    if (!file) {
+      return Promise.resolve(null);
+    }
+
+    if (
+      !file.type ||
+      !file.type.startsWith("image/")
+    ) {
+      return Promise.reject(
+        new Error(
+          `${file.name} is not a supported image file.`
+        )
+      );
+    }
+
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      return Promise.reject(
+        new Error(
+          `${file.name} is larger than 10 MB.`
+        )
+      );
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onerror = () => {
+        reject(
+          new Error(
+            `Could not read ${file.name}.`
+          )
+        );
+      };
+
+      reader.onload = () => {
+        resolve({
+          photo_name: file.name,
+          photo_type:
+            file.type || "image/jpeg",
+          photo_data: reader.result
+        });
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function popupHtml(row) {
+    const name =
+      row.name ||
+      row.restroom_name ||
+      "Public Restroom";
+
+    const address = row.address || "";
+    const hours =
+      row.advertised_hours || "";
+
+    const googleMapsUrl =
+      row.latitude &&
+      row.longitude
+        ? `https://www.google.com/maps?q=${encodeURIComponent(
+            row.latitude
+          )},${encodeURIComponent(
+            row.longitude
+          )}`
+        : "";
+
+    return `
+      <div class="restroomPopup">
+        <div class="popupTitle">
+          ${escapeHtml(name)}
         </div>
 
-        <button type="button" id="useLocationBtn" class="secondaryBtn">
-          Use my location
-        </button>
+        ${
+          address
+            ? `
+              <div class="popupAddress">
+                ${escapeHtml(address)}
+              </div>
+            `
+            : ""
+        }
 
-        <p class="locationHint">
-          For a new restroom, you can also click directly on the map to set the
-          location.
-        </p>
-      </details>
+        <div class="popupStatus popupStatus-${statusFor(row)}">
+          ${statusLabel(row)}
+        </div>
 
-      <details>
-        <summary>Access &amp; finding it</summary>
+        ${
+          hours
+            ? `
+              <div class="popupHours">
+                <strong>Hours:</strong>
+                ${escapeHtml(hours)}
+              </div>
+            `
+            : ""
+        }
 
-        <label>
-          Is the restroom open when you visited it? *
-          <select id="open_when_visited" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-            <option>Permanently closed</option>
-          </select>
-        </label>
+        <div class="popupActions">
+          ${
+            googleMapsUrl
+              ? `
+                <a
+                  class="popupActionLink"
+                  href="${googleMapsUrl}"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Google Maps
+                </a>
+              `
+              : ""
+          }
 
-        <label>
-          What are the hours? *
-          <input id="advertised_hours" required />
-        </label>
+          <button
+            type="button"
+            class="popupAuditBtn"
+            data-audit-update
+          >
+            Suggest a change
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
-        <label>
-          How is this bathroom accessed? *
-          <select id="access_method" required>
-            <option value="">—</option>
-            <option>Accessed from outside the building</option>
-            <option>Accessed from inside the building</option>
-            <option>Employee Access Only</option>
-          </select>
-        </label>
+  function drawMarkers(rows) {
+    markers.clearLayers();
 
-        <label>
-          Was this restroom easy to find? *
-          <select id="findability" required>
-            <option value="">—</option>
-            <option>Easily Visible</option>
-            <option>Somewhat visible</option>
-            <option>Somewhat hard to find</option>
-            <option>Very hard to find</option>
-          </select>
-        </label>
-      </details>
+    const bounds = [];
 
-      <details>
-        <summary>Amenities &amp; safety</summary>
+    rows.forEach((row) => {
+      const latitude =
+        parseFloat(row.latitude);
 
-        <label>
-          Gender-neutral restroom available? *
-          <select id="gender_neutral" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+      const longitude =
+        parseFloat(row.longitude);
 
-        <label>
-          Menstrual products available? *
-          <select id="menstrual_products" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+      if (
+        Number.isNaN(latitude) ||
+        Number.isNaN(longitude)
+      ) {
+        return;
+      }
 
-        <label>
-          Showers available? *
-          <select id="showers_available" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+      const marker = L.circleMarker(
+        [latitude, longitude],
+        {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: statusColor(row),
+          fillOpacity: 0.92
+        }
+      );
 
-        <label>
-          Water refill nearby? *
-          <select id="water_refill_nearby" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+      marker.bindPopup(
+        popupHtml(row),
+        {
+          maxWidth: 380
+        }
+      );
 
-        <label>
-          Visible signage? *
-          <select id="visible_signage" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+      marker.on(
+        "popupopen",
+        (event) => {
+          const button =
+            event.popup
+              .getElement()
+              ?.querySelector(
+                "[data-audit-update]"
+              );
 
-        <label>
-          Security cameras present? *
-          <select id="security_cameras" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+          if (!button) return;
 
-        <label>
-          ADA accessible? *
-          <select id="ada_accessible" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-          </select>
-        </label>
+          button.onclick = () => {
+            map.closePopup();
+            fillForm(row);
+            openPanel();
+          };
+        }
+      );
 
-        <label>
-          Doors on restroom stalls?
-          <select id="stall_doors" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-            <option>Not applicable</option>
-          </select>
-        </label>
+      marker.addTo(markers);
 
-        <label>
-          Hand soap available at sinks?
-          <select id="hand_soap" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-            <option>Not applicable</option>
-          </select>
-        </label>
+      bounds.push([
+        latitude,
+        longitude
+      ]);
+    });
 
-        <label>
-          Baby changing / diaper changing station?
-          <select id="baby_changing_station" required>
-            <option value="">—</option>
-            <option>Yes</option>
-            <option>No</option>
-            <option>Not applicable</option>
-          </select>
-        </label>
-      </details>
+    if (bounds.length) {
+      map.fitBounds(bounds, {
+        padding: [35, 35]
+      });
+    }
+  }
 
-      <details>
-        <summary>Observations</summary>
+  async function loadRestrooms() {
+    const response = await fetch(
+      `${RESTROOMS_CSV_URL}&_=${Date.now()}`,
+      {
+        cache: "no-store"
+      }
+    );
 
-        <label>
-          Other barriers to access
-          <textarea id="access_barriers"></textarea>
-        </label>
+    if (!response.ok) {
+      throw new Error(
+        `Could not load restroom data. HTTP ${response.status}`
+      );
+    }
 
-        <label>
-          Overall impressions
-          <textarea id="overall_impressions"></textarea>
-        </label>
+    const text = await response.text();
 
-        <label>
-          Outside appearance &amp; activity
-          <textarea id="outside_context"></textarea>
-        </label>
+    const parsed = Papa.parse(
+      text,
+      {
+        header: true,
+        skipEmptyLines: true
+      }
+    );
 
-        <label>
-          Additional notes
-          <textarea id="notes"></textarea>
-        </label>
+    drawMarkers(parsed.data);
+  }
 
-        <label>
-          Add photos
-          <input
-            id="audit_photo"
-            type="file"
-            accept="image/*"
-            multiple
-          />
+  $("startAuditBtn").addEventListener(
+    "click",
+    () => {
+      resetForm();
+      openPanel();
+    }
+  );
 
-          <small class="fieldHint">
-            Optional. You may select multiple photos. Photos are reviewed with
-            the submission and are not published automatically.
-          </small>
-        </label>
-      </details>
+  $("closeAuditBtn").addEventListener(
+    "click",
+    closePanel
+  );
 
-      <button id="submitBtn" type="submit" class="submitBtn">
-        Submit suggestion
-      </button>
+  backdrop.addEventListener(
+    "click",
+    closePanel
+  );
 
-      <div id="status" aria-live="polite"></div>
-    </form>
-  </aside>
+  map.on("click", (event) => {
+    if (
+      !panel.classList.contains("open") ||
+      actionEl.value !== "new"
+    ) {
+      return;
+    }
 
-  <div id="panelBackdrop" class="panelBackdrop" hidden></div>
+    const latitude =
+      event.latlng.lat;
 
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    const longitude =
+      event.latlng.lng;
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    setValue(
+      "latitude",
+      latitude.toFixed(6)
+    );
 
-  <script src="./app_map_audit.js?v=9"></script>
-</body>
-</html>
+    setValue(
+      "longitude",
+      longitude.toFixed(6)
+    );
+
+    setDraftMarker(
+      latitude,
+      longitude
+    );
+  });
+
+  $("useLocationBtn").addEventListener(
+    "click",
+    () => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const latitude =
+            position.coords.latitude;
+
+          const longitude =
+            position.coords.longitude;
+
+          map.setView(
+            [latitude, longitude],
+            17
+          );
+
+          setValue(
+            "latitude",
+            latitude.toFixed(6)
+          );
+
+          setValue(
+            "longitude",
+            longitude.toFixed(6)
+          );
+
+          if (actionEl.value === "new") {
+            setDraftMarker(
+              latitude,
+              longitude
+            );
+          }
+        },
+        () => {
+          alert(
+            "Unable to access your location. You can click the map instead."
+          );
+        }
+      );
+    }
+  );
+
+  form.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+
+      if (!form.reportValidity()) {
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent =
+        "Submitting…";
+      statusEl.textContent = "";
+
+      let photos = [];
+
+      try {
+        const selectedFiles =
+          Array.from(
+            photoEl.files || []
+          );
+
+        if (selectedFiles.length > 5) {
+          throw new Error(
+            "Please submit no more than five photos."
+          );
+        }
+
+        photos = (
+          await Promise.all(
+            selectedFiles.map(
+              preparePhoto
+            )
+          )
+        ).filter(Boolean);
+
+      } catch (error) {
+        statusEl.textContent =
+          error.message;
+
+        submitBtn.disabled = false;
+        submitBtn.textContent =
+          "Submit suggestion";
+
+        return;
+      }
+
+      const payload = {
+        record_type: "restroom",
+
+        place_id:
+          value("place_id"),
+
+        action:
+          value("action"),
+
+        audit_datetime:
+          value("audit_datetime"),
+
+        restroom_name:
+          value("restroom_name"),
+
+        researcher_name:
+          value("researcher_name"),
+
+        address:
+          value("address"),
+
+        latitude:
+          value("latitude"),
+
+        longitude:
+          value("longitude"),
+
+        open_when_visited:
+          value("open_when_visited"),
+
+        advertised_hours:
+          value("advertised_hours"),
+
+        access_method:
+          value("access_method"),
+
+        findability:
+          value("findability"),
+
+        gender_neutral:
+          value("gender_neutral"),
+
+        menstrual_products:
+          value("menstrual_products"),
+
+        showers_available:
+          value("showers_available"),
+
+        water_refill_nearby:
+          value("water_refill_nearby"),
+
+        visible_signage:
+          value("visible_signage"),
+
+        security_cameras:
+          value("security_cameras"),
+
+        ada_accessible:
+          value("ada_accessible"),
+
+        stall_doors:
+          value("stall_doors"),
+
+        hand_soap:
+          value("hand_soap"),
+
+        baby_changing_station:
+          value("baby_changing_station"),
+
+        access_barriers:
+          value("access_barriers"),
+
+        overall_impressions:
+          value("overall_impressions"),
+
+        outside_context:
+          value("outside_context"),
+
+        notes:
+          value("notes"),
+
+        /*
+         * Multiple-photo format.
+         */
+        photos: photos,
+
+        /*
+         * Compatibility with older Apps Script deployments.
+         */
+        photo_name:
+          photos.length > 0
+            ? photos[0].photo_name
+            : "",
+
+        photo_type:
+          photos.length > 0
+            ? photos[0].photo_type
+            : "",
+
+        photo_data:
+          photos.length > 0
+            ? photos[0].photo_data
+            : ""
+      };
+
+      try {
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "text/plain;charset=utf-8"
+            },
+
+            body: JSON.stringify(payload)
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Submission failed. HTTP ${response.status}`
+          );
+        }
+
+        const responseText =
+          await response.text();
+
+        let result;
+
+        try {
+          result =
+            JSON.parse(responseText);
+        } catch {
+          throw new Error(
+            "The web app returned an invalid response: " +
+              responseText
+          );
+        }
+
+        if (
+          result &&
+          result.success === false
+        ) {
+          throw new Error(
+            result.error ||
+              "Submission rejected."
+          );
+        }
+
+        statusEl.textContent =
+          photos.length > 0
+            ? "Submitted ✓ Audit and photo uploaded successfully."
+            : "Submitted ✓ Your audit is awaiting review.";
+
+        setTimeout(() => {
+          resetForm();
+          closePanel();
+        }, 1500);
+
+      } catch (error) {
+        console.error(error);
+
+        statusEl.textContent =
+          error.message ||
+          "Submit failed. Please try again.";
+
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent =
+          "Submit suggestion";
+      }
+    }
+  );
+
+  const legend = L.control({
+    position: "bottomright"
+  });
+
+  legend.onAdd = () => {
+    const div = L.DomUtil.create(
+      "div",
+      "mapLegend"
+    );
+
+    div.innerHTML = `
+      <div class="legendTitle">
+        Restroom Status
+      </div>
+
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#2563eb"
+        ></span>
+        Open
+      </div>
+
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#dc2626"
+        ></span>
+        Closed
+      </div>
+
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#808080"
+        ></span>
+        Unknown
+      </div>
+    `;
+
+    L.DomEvent.disableClickPropagation(div);
+
+    return div;
+  };
+
+  legend.addTo(map);
+
+  loadRestrooms().catch((error) => {
+    console.error(error);
+  });
+});
