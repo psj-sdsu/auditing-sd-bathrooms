@@ -8,7 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const RESTROOMS_SHEET = "restrooms_editable";
 
   const RESTROOMS_CSV_URL =
-    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(RESTROOMS_SHEET)}`;
+    `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+      RESTROOMS_SHEET
+    )}`;
 
   const $ = (id) => document.getElementById(id);
 
@@ -45,12 +47,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return element ? element.value.trim() : "";
   }
 
-  function setValue(id, value) {
+  function setValue(id, newValue) {
     const element = $(id);
-    if (element) element.value = value || "";
+    if (element) {
+      element.value = newValue || "";
+    }
   }
 
-  function isYes(value) {
+  function isYes(input) {
     return [
       "yes",
       "true",
@@ -58,11 +62,13 @@ document.addEventListener("DOMContentLoaded", () => {
       "1.0",
       "open"
     ].includes(
-      String(value || "").trim().toLowerCase()
+      String(input || "")
+        .trim()
+        .toLowerCase()
     );
   }
 
-  function isNo(value) {
+  function isNo(input) {
     return [
       "no",
       "false",
@@ -71,19 +77,21 @@ document.addEventListener("DOMContentLoaded", () => {
       "closed",
       "permanently closed"
     ].includes(
-      String(value || "").trim().toLowerCase()
+      String(input || "")
+        .trim()
+        .toLowerCase()
     );
   }
 
-  function yesNo(value) {
-    if (!value) return "";
-    if (isYes(value)) return "Yes";
-    if (isNo(value)) return "No";
-    return value;
+  function yesNo(input) {
+    if (!input) return "";
+    if (isYes(input)) return "Yes";
+    if (isNo(input)) return "No";
+    return input;
   }
 
-  function escapeHtml(value) {
-    return String(value || "").replace(
+  function escapeHtml(input) {
+    return String(input || "").replace(
       /[&<>"']/g,
       (character) => ({
         "&": "&amp;",
@@ -129,14 +137,20 @@ document.addEventListener("DOMContentLoaded", () => {
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
     backdrop.hidden = false;
-    setTimeout(() => map.invalidateSize(), 250);
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
   }
 
   function closePanel() {
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden", "true");
     backdrop.hidden = true;
-    setTimeout(() => map.invalidateSize(), 250);
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
   }
 
   function clearDraftMarker() {
@@ -146,10 +160,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function setDraftMarker(lat, lng) {
+  function setDraftMarker(latitude, longitude) {
     clearDraftMarker();
 
-    draftMarker = L.marker([lat, lng])
+    draftMarker = L.marker([
+      latitude,
+      longitude
+    ])
       .addTo(map)
       .bindPopup("New restroom location")
       .openPopup();
@@ -181,7 +198,6 @@ document.addEventListener("DOMContentLoaded", () => {
       row.place_id ||
       "";
 
-    actionEl.value = "update";
     setMode("update");
 
     setValue(
@@ -192,10 +208,11 @@ document.addEventListener("DOMContentLoaded", () => {
     setValue("address", row.address);
     setValue("latitude", row.latitude);
     setValue("longitude", row.longitude);
+
     setValue(
       "open_when_visited",
       row.open_when_visited ||
-      row.restroom_open_status
+        row.restroom_open_status
     );
 
     setValue(
@@ -225,7 +242,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setValue(
       "showers_available",
-      yesNo(row.showers_available || row.showers)
+      yesNo(
+        row.showers_available ||
+        row.showers
+      )
     );
 
     setValue(
@@ -265,27 +285,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setValue("notes", "");
     setValue("audit_datetime", "");
+
     statusEl.textContent = "";
   }
 
+  /*
+   * Converts one selected image into a compressed base64 image.
+   */
   function preparePhoto(file) {
     if (!file) {
-      return Promise.resolve({
-        photo_name: "",
-        photo_type: "",
-        photo_data: ""
-      });
+      return Promise.resolve(null);
     }
 
     if (!file.type.startsWith("image/")) {
       return Promise.reject(
-        new Error("Please choose an image file.")
+        new Error(
+          `${file.name} is not an image file.`
+        )
       );
     }
 
     if (file.size > 12 * 1024 * 1024) {
       return Promise.reject(
-        new Error("Please choose an image smaller than 12 MB.")
+        new Error(
+          `${file.name} is larger than 12 MB.`
+        )
       );
     }
 
@@ -294,7 +318,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       reader.onerror = () => {
         reject(
-          new Error("The selected image could not be read.")
+          new Error(
+            `Could not read ${file.name}.`
+          )
         );
       };
 
@@ -303,16 +329,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
         image.onerror = () => {
           reject(
-            new Error("The selected image could not be processed.")
+            new Error(
+              `Could not process ${file.name}.`
+            )
           );
         };
 
         image.onload = () => {
-          const maximum = 1600;
+          const maximumDimension = 1600;
+
           const scale = Math.min(
             1,
-            maximum /
-              Math.max(image.width, image.height)
+            maximumDimension /
+              Math.max(
+                image.width,
+                image.height
+              )
           );
 
           const canvas =
@@ -362,11 +394,8 @@ document.addEventListener("DOMContentLoaded", () => {
       row.restroom_name ||
       "Public Restroom";
 
-    const address =
-      row.address || "";
-
-    const hours =
-      row.advertised_hours || "";
+    const address = row.address || "";
+    const hours = row.advertised_hours || "";
 
     const googleMapsUrl =
       row.latitude &&
@@ -456,17 +485,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const marker =
-        L.circleMarker(
-          [latitude, longitude],
-          {
-            radius: 7,
-            color: "#ffffff",
-            weight: 2,
-            fillColor: statusColor(row),
-            fillOpacity: 0.92
-          }
-        );
+      const marker = L.circleMarker(
+        [latitude, longitude],
+        {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: statusColor(row),
+          fillOpacity: 0.92
+        }
+      );
 
       marker.bindPopup(
         popupHtml(row),
@@ -500,23 +528,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (bounds.length) {
-      map.fitBounds(
-        bounds,
-        {
-          padding: [35, 35]
-        }
-      );
+      map.fitBounds(bounds, {
+        padding: [35, 35]
+      });
     }
   }
 
   async function loadRestrooms() {
-    const response =
-      await fetch(
-        `${RESTROOMS_CSV_URL}&_=${Date.now()}`,
-        {
-          cache: "no-store"
-        }
-      );
+    const response = await fetch(
+      `${RESTROOMS_CSV_URL}&_=${Date.now()}`,
+      {
+        cache: "no-store"
+      }
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -524,17 +548,12 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    const text =
-      await response.text();
+    const text = await response.text();
 
-    const parsed =
-      Papa.parse(
-        text,
-        {
-          header: true,
-          skipEmptyLines: true
-        }
-      );
+    const parsed = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true
+    });
 
     drawMarkers(parsed.data);
   }
@@ -557,38 +576,32 @@ document.addEventListener("DOMContentLoaded", () => {
     closePanel
   );
 
-  map.on(
-    "click",
-    (event) => {
-      if (
-        !panel.classList.contains("open") ||
-        actionEl.value !== "new"
-      ) {
-        return;
-      }
-
-      const latitude =
-        event.latlng.lat;
-
-      const longitude =
-        event.latlng.lng;
-
-      setValue(
-        "latitude",
-        latitude.toFixed(6)
-      );
-
-      setValue(
-        "longitude",
-        longitude.toFixed(6)
-      );
-
-      setDraftMarker(
-        latitude,
-        longitude
-      );
+  map.on("click", (event) => {
+    if (
+      !panel.classList.contains("open") ||
+      actionEl.value !== "new"
+    ) {
+      return;
     }
-  );
+
+    const latitude = event.latlng.lat;
+    const longitude = event.latlng.lng;
+
+    setValue(
+      "latitude",
+      latitude.toFixed(6)
+    );
+
+    setValue(
+      "longitude",
+      longitude.toFixed(6)
+    );
+
+    setDraftMarker(
+      latitude,
+      longitude
+    );
+  });
 
   $("useLocationBtn").addEventListener(
     "click",
@@ -645,12 +658,25 @@ document.addEventListener("DOMContentLoaded", () => {
       submitBtn.textContent = "Submitting…";
       statusEl.textContent = "";
 
-      let photo;
+      let photos = [];
 
       try {
-        photo = await preparePhoto(
-          photoEl.files[0]
+        const selectedFiles = Array.from(
+          photoEl.files || []
         );
+
+        if (selectedFiles.length > 5) {
+          throw new Error(
+            "Please submit no more than five photos."
+          );
+        }
+
+        photos = (
+          await Promise.all(
+            selectedFiles.map(preparePhoto)
+          )
+        ).filter(Boolean);
+
       } catch (error) {
         statusEl.textContent =
           error.message;
@@ -664,47 +690,88 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const payload = {
         record_type: "restroom",
+
         place_id: value("place_id"),
         action: value("action"),
-        audit_datetime: value("audit_datetime"),
-        restroom_name: value("restroom_name"),
-        researcher_name: value("researcher_name"),
+
+        audit_datetime:
+          value("audit_datetime"),
+
+        restroom_name:
+          value("restroom_name"),
+
+        researcher_name:
+          value("researcher_name"),
+
         address: value("address"),
         latitude: value("latitude"),
         longitude: value("longitude"),
-        open_when_visited: value("open_when_visited"),
-        advertised_hours: value("advertised_hours"),
-        access_method: value("access_method"),
-        findability: value("findability"),
-        gender_neutral: value("gender_neutral"),
-        menstrual_products: value("menstrual_products"),
-        showers_available: value("showers_available"),
-        water_refill_nearby: value("water_refill_nearby"),
-        visible_signage: value("visible_signage"),
-        security_cameras: value("security_cameras"),
-        ada_accessible: value("ada_accessible"),
-        access_barriers: value("access_barriers"),
-        overall_impressions: value("overall_impressions"),
-        outside_context: value("outside_context"),
+
+        open_when_visited:
+          value("open_when_visited"),
+
+        advertised_hours:
+          value("advertised_hours"),
+
+        access_method:
+          value("access_method"),
+
+        findability:
+          value("findability"),
+
+        gender_neutral:
+          value("gender_neutral"),
+
+        menstrual_products:
+          value("menstrual_products"),
+
+        showers_available:
+          value("showers_available"),
+
+        water_refill_nearby:
+          value("water_refill_nearby"),
+
+        visible_signage:
+          value("visible_signage"),
+
+        security_cameras:
+          value("security_cameras"),
+
+        ada_accessible:
+          value("ada_accessible"),
+
+        access_barriers:
+          value("access_barriers"),
+
+        overall_impressions:
+          value("overall_impressions"),
+
+        outside_context:
+          value("outside_context"),
+
         notes: value("notes"),
-        photo_name: photo.photo_name,
-        photo_type: photo.photo_type,
-        photo_data: photo.photo_data
+
+        /*
+         * This is the important change.
+         * Every selected photo is sent to Apps Script.
+         */
+        photos: photos
       };
 
       try {
-        const response =
-          await fetch(
-            APPS_SCRIPT_URL,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "text/plain;charset=utf-8"
-              },
-              body: JSON.stringify(payload)
-            }
-          );
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "text/plain;charset=utf-8"
+            },
+
+            body: JSON.stringify(payload)
+          }
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -721,20 +788,17 @@ document.addEventListener("DOMContentLoaded", () => {
         ) {
           throw new Error(
             result.error ||
-            "Submission rejected."
+              "Submission rejected."
           );
         }
 
         statusEl.textContent =
           "Submitted ✓ Your audit is awaiting review.";
 
-        setTimeout(
-          () => {
-            resetForm();
-            closePanel();
-          },
-          1200
-        );
+        setTimeout(() => {
+          resetForm();
+          closePanel();
+        }, 1200);
 
       } catch (error) {
         console.error(error);
@@ -750,59 +814,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   );
 
-  const legend =
-    L.control({
-      position: "bottomright"
-    });
+  const legend = L.control({
+    position: "bottomright"
+  });
 
-  legend.onAdd =
-    () => {
-      const div =
-        L.DomUtil.create(
-          "div",
-          "mapLegend"
-        );
+  legend.onAdd = () => {
+    const div = L.DomUtil.create(
+      "div",
+      "mapLegend"
+    );
 
-      div.innerHTML = `
-        <div class="legendTitle">
-          Restroom Status
-        </div>
+    div.innerHTML = `
+      <div class="legendTitle">
+        Restroom Status
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#2563eb"
-          ></span>
-          Open
-        </div>
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#2563eb"
+        ></span>
+        Open
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#dc2626"
-          ></span>
-          Closed
-        </div>
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#dc2626"
+        ></span>
+        Closed
+      </div>
 
-        <div class="legendItem">
-          <span
-            class="legendDot"
-            style="background:#808080"
-          ></span>
-          Unknown
-        </div>
-      `;
+      <div class="legendItem">
+        <span
+          class="legendDot"
+          style="background:#808080"
+        ></span>
+        Unknown
+      </div>
+    `;
 
-      L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableClickPropagation(div);
 
-      return div;
-    };
+    return div;
+  };
 
   legend.addTo(map);
 
-  loadRestrooms().catch(
-    (error) => {
-      console.error(error);
-    }
-  );
+  loadRestrooms().catch((error) => {
+    console.error(error);
+  });
 });
