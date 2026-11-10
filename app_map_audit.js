@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbxlUzoIYNrVice9e4imFyxny7N8EknWVB13wby8fJKpsl4RkYD_W_PHZ5BhC1XLXiaOow/exec";
+  "https://script.google.com/macros/s/AKfycbyIg5O0NBst7ICf8XgIsMh1U64w5vELk7jCYQeGVxqnNY0hsMKPqoVjDhZ3zojQTRCrZA/exec";
 
   const SPREADSHEET_ID =
     "1jb6Oi_8Ldmj9tJdjuBsDJDJ0jRNhPSN3-CUaCLrPyR0";
