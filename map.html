@@ -11,7 +11,7 @@
     href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
   />
 
-  <link rel="stylesheet" href="./map_audit.css?v=4" />
+  <link rel="stylesheet" href="./map_audit.css?v=5" />
 </head>
 
 <body>
@@ -29,24 +29,16 @@
     + Start an Audit
   </button>
 
-  <aside
-    id="auditPanel"
-    aria-hidden="true"
-  >
+  <aside id="auditPanel" aria-hidden="true">
     <div class="auditPanelHeader">
       <div>
-        <p class="eyebrow">
-          Project for Sanitation Justice
-        </p>
+        <p class="eyebrow">Project for Sanitation Justice</p>
 
         <h2 id="auditPanelTitle">
           Restroom Audit
         </h2>
 
-        <p
-          id="modeIndicator"
-          class="modeText"
-        >
+        <p id="modeIndicator" class="modeText">
           Suggest a new restroom location
         </p>
       </div>
@@ -74,75 +66,45 @@
     </div>
 
     <form id="surveyForm">
-      <input
-        type="hidden"
-        id="place_id"
-      />
-
-      <input
-        type="hidden"
-        id="action"
-        value="new"
-      />
+      <input type="hidden" id="place_id" />
+      <input type="hidden" id="action" value="new" />
 
       <details open>
         <summary>Basics</summary>
 
         <label>
           Date and time of audit *
-          <input
-            id="audit_datetime"
-            type="datetime-local"
-            required
-          />
+          <input id="audit_datetime" type="datetime-local" required />
         </label>
 
         <label>
           Name of Restroom *
-          <input
-            id="restroom_name"
-            required
-          />
+          <input id="restroom_name" required />
         </label>
 
         <label>
           Researcher Name *
-          <input
-            id="researcher_name"
-            required
-          />
+          <input id="researcher_name" required />
         </label>
 
         <label>
           Address / Nearby landmark
-          <input
-            id="address"
-          />
+          <input id="address" />
         </label>
 
         <div class="row2">
           <label>
             Latitude *
-            <input
-              id="latitude"
-              required
-            />
+            <input id="latitude" required />
           </label>
 
           <label>
             Longitude *
-            <input
-              id="longitude"
-              required
-            />
+            <input id="longitude" required />
           </label>
         </div>
 
-        <button
-          type="button"
-          id="useLocationBtn"
-          class="secondaryBtn"
-        >
+        <button type="button" id="useLocationBtn" class="secondaryBtn">
           Use my location
         </button>
 
@@ -157,10 +119,7 @@
 
         <label>
           Is the restroom open when you visited it? *
-          <select
-            id="open_when_visited"
-            required
-          >
+          <select id="open_when_visited" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -170,18 +129,12 @@
 
         <label>
           What are the hours? *
-          <input
-            id="advertised_hours"
-            required
-          />
+          <input id="advertised_hours" required />
         </label>
 
         <label>
           How is this bathroom accessed? *
-          <select
-            id="access_method"
-            required
-          >
+          <select id="access_method" required>
             <option value="">—</option>
             <option>Accessed from outside the building</option>
             <option>Accessed from inside the building</option>
@@ -191,10 +144,7 @@
 
         <label>
           Was this restroom easy to find? *
-          <select
-            id="findability"
-            required
-          >
+          <select id="findability" required>
             <option value="">—</option>
             <option>Easily Visible</option>
             <option>Somewhat visible</option>
@@ -209,10 +159,7 @@
 
         <label>
           Gender-neutral restroom available? *
-          <select
-            id="gender_neutral"
-            required
-          >
+          <select id="gender_neutral" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -221,10 +168,7 @@
 
         <label>
           Menstrual products available? *
-          <select
-            id="menstrual_products"
-            required
-          >
+          <select id="menstrual_products" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -233,10 +177,7 @@
 
         <label>
           Showers available? *
-          <select
-            id="showers_available"
-            required
-          >
+          <select id="showers_available" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -245,10 +186,7 @@
 
         <label>
           Water refill nearby? *
-          <select
-            id="water_refill_nearby"
-            required
-          >
+          <select id="water_refill_nearby" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -257,10 +195,7 @@
 
         <label>
           Visible signage? *
-          <select
-            id="visible_signage"
-            required
-          >
+          <select id="visible_signage" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -269,10 +204,7 @@
 
         <label>
           Security cameras present? *
-          <select
-            id="security_cameras"
-            required
-          >
+          <select id="security_cameras" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
@@ -281,13 +213,40 @@
 
         <label>
           ADA accessible? *
-          <select
-            id="ada_accessible"
-            required
-          >
+          <select id="ada_accessible" required>
             <option value="">—</option>
             <option>Yes</option>
             <option>No</option>
+          </select>
+        </label>
+
+        <label>
+          Doors on restroom stalls?
+          <select id="stall_doors" required>
+            <option value="">—</option>
+            <option>Yes</option>
+            <option>No</option>
+            <option>Not applicable</option>
+          </select>
+        </label>
+
+        <label>
+          Hand soap available at sinks?
+          <select id="hand_soap" required>
+            <option value="">—</option>
+            <option>Yes</option>
+            <option>No</option>
+            <option>Not applicable</option>
+          </select>
+        </label>
+
+        <label>
+          Baby changing / diaper changing station?
+          <select id="baby_changing_station" required>
+            <option value="">—</option>
+            <option>Yes</option>
+            <option>No</option>
+            <option>Not applicable</option>
           </select>
         </label>
       </details>
@@ -322,7 +281,6 @@
             type="file"
             accept="image/*"
             multiple
-            capture="environment"
           />
 
           <small class="fieldHint">
@@ -332,31 +290,20 @@
         </label>
       </details>
 
-      <button
-        id="submitBtn"
-        type="submit"
-        class="submitBtn"
-      >
+      <button id="submitBtn" type="submit" class="submitBtn">
         Submit suggestion
       </button>
 
-      <div
-        id="status"
-        aria-live="polite"
-      ></div>
+      <div id="status" aria-live="polite"></div>
     </form>
   </aside>
 
-  <div
-    id="panelBackdrop"
-    class="panelBackdrop"
-    hidden
-  ></div>
+  <div id="panelBackdrop" class="panelBackdrop" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <script src="./app_map_audit.js?v=6"></script>
+  <script src="./app_map_audit.js?v=8"></script>
 </body>
 </html>
